@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.0.8";
+my $version = "0.0.18";
 
 
 
@@ -76,7 +76,7 @@ sub TeslaPowerwall2AC_Attr(@);
 sub TeslaPowerwall2AC_Define($$);
 sub TeslaPowerwall2AC_Initialize($);
 sub TeslaPowerwall2AC_Get($@);
-sub TeslaPowerwall2AC_GetData($@);
+sub TeslaPowerwall2AC_GetData($);
 sub TeslaPowerwall2AC_Undef($$);
 sub TeslaPowerwall2AC_ResponseProcessing($$$);
 sub TeslaPowerwall2AC_ReadingsProcessing_Aggregates($$);
@@ -94,7 +94,6 @@ my %paths = (   'statussoe'         => 'system_status/soe',
                 'sitemaster'        => 'sitemaster',
                 'powerwalls'        => 'powerwalls'
 );
-my %readings = ();
 
 
 sub TeslaPowerwall2AC_Initialize($) {
@@ -144,11 +143,11 @@ sub TeslaPowerwall2AC_Define($$) {
     
     if( $init_done ) {
         
-        #TeslaPowerwall2AC_Timer_GetData($hash);
+        TeslaPowerwall2AC_Timer_GetData($hash);
             
     } else {
         
-        #InternalTimer( gettimeofday()+15, "TeslaPowerwall2AC_Timer_GetData", $hash, 0 );
+        InternalTimer( gettimeofday()+15, "TeslaPowerwall2AC_Timer_GetData", $hash );
     }
     
     $modules{TeslaPowerwall2AC}{defptr}{HOST} = $hash;
@@ -212,9 +211,10 @@ sub TeslaPowerwall2AC_Get($@) {
     
     my ($hash, $name, $cmd) = @_;
     my $arg;
-    #my ($hash, $name, $cmd, @args)  = @_;
-    #my ($arg, @params)              = @args;
-
+    
+    
+    # ensure actionQueue exists
+    $hash->{actionQueue} = [] if( not defined($hash->{actionQueue}) );
 
     if( $cmd eq 'statusSOE' ) {
 
@@ -245,9 +245,11 @@ sub TeslaPowerwall2AC_Get($@) {
     
         #my $json = '{"powerwalls":[{"PackagePartNumber":"1234567-89-E","PackageSerialNumber":"A12B3456789"}]}';
         #TeslaPowerwall2AC_ResponseProcessing($hash,$arg,$json);
+
+
+    unshift( @{$hash->{actionQueue}}, $arg );
     
-    
-    TeslaPowerwall2AC_GetData($hash,$arg);
+    TeslaPowerwall2AC_GetData($hash);
 
     return undef;
 }
@@ -258,12 +260,17 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
     my $name    = $hash->{NAME};
     
     
-    if( not IsDisabled($name) ) {
+    # ensure actionQueue exists
+    $hash->{actionQueue} = [] if( not defined($hash->{actionQueue}) );
     
-        TeslaPowerwall2AC_GetData($hash,'all','all');
+    if( not IsDisabled($name) ) {
+        while( my $obj = each %{$paths} ) {
+            unshift( @{$hash->{actionQueue}}, $obj );
+        }
+        
+        TeslaPowerwall2AC_GetData($hash);
         
     } else {
-    
         readingsSingleUpdate($hash,'state','disabled',1);
     }
     
@@ -271,50 +278,17 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Call InternalTimer TeslaPowerwall2AC_Timer_GetData";
 }
 
-sub TeslaPowerwall2AC_GetData($@) {
+sub TeslaPowerwall2AC_GetData($) {
 
-    my ($hash,$path)    = @_;
+    my ($hash)          = @_;
+    
     my $name            = $hash->{NAME};
     my $host            = $hash->{HOST};
     my $port            = $hash->{PORT};
-
+    my $path = pop( @{$hash->{actionQueue}} );
     my $uri             = $host . ':' . $port . '/api/' . $paths{$path};
-    
-    
-    
-    
-    
-    
-    # ensure actionQueue exists
-    $hash->{actionQueue} = [] if ( ! defined( $hash->{actionQueue} ) );
 
-    # Queue if not yet retried and currently waiting
-    if( defined( $hash->{doStatus}) and $hash->{doStatus} =~ /^WAITING/ and $retryCount == 0 ) {
-        # add to queue
-        Log3 $name, 4, "LoeweTV_SendRequest $name: add action to queue - args: ".$actionString;
-        # RequestAccess will always be added to the beginning of the queue
-        if ( ( $action eq "RequestAccess" ) )  {
-            unshift( @{ $hash->{actionQueue} }, \@args );
-        } else {
-            push( @{ $hash->{actionQueue} }, \@args );
-        }
-        
-        return;
-    }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     readingsSingleUpdate($hash,'state','fetch data',1);
 
     HttpUtils_NonblockingGet(
@@ -389,18 +363,9 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
 
         ### End Error Handling
     }
-
-
-    $hash->{doStatus} = "";
-
-    #########################
-    # start next command in queue if available
-    if( defined( $hash->{actionQueue}) and scalar( @{ $hash->{actionQueue}}) ) {
-        my $ref = shift @{ $hash->{actionQueue} };
-        Log3 $name, 4, "LoeweTV_HU_Callback $name: handle queued cmd with :@$ref[0]: ";
-        LoeweTV_SendRequest( $hash, @$ref[0], @$ref[1], @$ref[2] );
-    }
     
+    TeslaPowerwall2AC_GetData($hash)
+    unless( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
     
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
     
