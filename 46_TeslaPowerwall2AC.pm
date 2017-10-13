@@ -241,7 +241,7 @@ sub TeslaPowerwall2AC_Get($@) {
 
     #########
     # zum testen
-        #my $json = '{"site":{"last_communication_time":"2017-10-04T21:40:58.189824673Z","instant_power":405.5284080505371,"instant_reactive_power":-489.71363067626953,"instant_apparent_power":635.8244488898933,"frequency":49.99971389770508,"energy_exported":86827,"energy_imported":74551,"instant_average_voltage":695.5163269042969,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0},"battery":{"last_communication_time":"2017-10-04T21:40:58.19075366Z","instant_power":-10,"instant_reactive_power":310,"instant_apparent_power":310.16124838541646,"frequency":50.011,"energy_exported":43300,"energy_imported":49580,"instant_average_voltage":229.60000000000002,"instant_total_current":-0.30000000000000004,"i_a_current":0,"i_b_current":0,"i_c_current":0},"load":{"last_communication_time":"2017-10-04T21:40:58.189824673Z","instant_power":410.06476697984374,"instant_reactive_power":95.1168869834601,"instant_apparent_power":420.95170187048524,"frequency":49.99971389770508,"energy_exported":0,"energy_imported":86641,"instant_average_voltage":695.5163269042969,"instant_total_current":0.58958323639219,"i_a_current":0,"i_b_current":0,"i_c_current":0},"solar":{"last_communication_time":"2017-10-04T21:40:58.190334999Z","instant_power":15.60922384262085,"instant_reactive_power":271.87248373031616,"instant_apparent_power":272.32020725363014,"frequency":50.049781799316406,"energy_exported":126771,"energy_imported":21574,"instant_average_voltage":695.6544494628906,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0},"busway":{"last_communication_time":"0001-01-01T00:00:00Z","instant_power":0,"instant_reactive_power":0,"instant_apparent_power":0,"frequency":0,"energy_exported":0,"energy_imported":0,"instant_average_voltage":0,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0},"frequency":{"last_communication_time":"0001-01-01T00:00:00Z","instant_power":0,"instant_reactive_power":0,"instant_apparent_power":0,"frequency":0,"energy_exported":0,"energy_imported":0,"instant_average_voltage":0,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0}}';
+        #my $json = '{"site":{"last_communication_time":"2017-10-13T19:16:23.896444247Z","instant_power":5.5513916015625,"instant_reactive_power":-197.36620712280273,"instant_apparent_power":197.44426469957278,"frequency":49.90053176879883,"energy_exported":159784,"energy_imported":183063,"instant_average_voltage":687.8249053955078,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0},"battery":{"last_communication_time":"2017-10-13T19:16:23.896606244Z","instant_power":2580,"instant_reactive_power":-50,"instant_apparent_power":2580.484450641003,"frequency":49.947,"energy_exported":90560,"energy_imported":109840,"instant_average_voltage":230.3,"instant_total_current":-64.9,"i_a_current":0,"i_b_current":0,"i_c_current":0},"load":{"last_communication_time":"2017-10-13T19:16:23.896444247Z","instant_power":2570.394101897115,"instant_reactive_power":-235.77139580030692,"instant_apparent_power":2581.184609853604,"frequency":49.90053176879883,"energy_exported":0,"energy_imported":200428,"instant_average_voltage":687.8249053955078,"instant_total_current":3.736988994923216,"i_a_current":0,"i_b_current":0,"i_c_current":0},"solar":{"last_communication_time":"2017-10-13T19:16:23.90554212Z","instant_power":-5.912493243813515,"instant_reactive_power":-6.48702609539032,"instant_apparent_power":8.777191117915539,"frequency":49.95012283325195,"energy_exported":235557,"energy_imported":39128,"instant_average_voltage":688.2974548339844,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0},"busway":{"last_communication_time":"0001-01-01T00:00:00Z","instant_power":0,"instant_reactive_power":0,"instant_apparent_power":0,"frequency":0,"energy_exported":0,"energy_imported":0,"instant_average_voltage":0,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0},"frequency":{"last_communication_time":"0001-01-01T00:00:00Z","instant_power":0,"instant_reactive_power":0,"instant_apparent_power":0,"frequency":0,"energy_exported":0,"energy_imported":0,"instant_average_voltage":0,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0}}';
     
         #my $json = '{"powerwalls":[{"PackagePartNumber":"1234567-89-E","PackageSerialNumber":"A12B3456789"}]}';
         #TeslaPowerwall2AC_ResponseProcessing($hash,$arg,$json);
@@ -264,7 +264,7 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
     $hash->{actionQueue} = [] if( not defined($hash->{actionQueue}) );
     
     if( not IsDisabled($name) ) {
-        while( my $obj = each %{$paths} ) {
+        while( my $obj = each %paths ) {
             unshift( @{$hash->{actionQueue}}, $obj );
         }
         
@@ -285,7 +285,7 @@ sub TeslaPowerwall2AC_GetData($) {
     my $name            = $hash->{NAME};
     my $host            = $hash->{HOST};
     my $port            = $hash->{PORT};
-    my $path = pop( @{$hash->{actionQueue}} );
+    my $path            = pop( @{$hash->{actionQueue}} );
     my $uri             = $host . ':' . $port . '/api/' . $paths{$path};
 
 
@@ -297,13 +297,13 @@ sub TeslaPowerwall2AC_GetData($) {
             timeout     => 5,
             method      => 'GET',
             hash        => $hash,
-            path        => $path,
+            setCmd      => $path,
             doTrigger   => 1,
             callback    => \&TeslaPowerwall2AC_ErrorHandling,
         }
     );
     
-    Log3 $name, 5, "TeslaPowerwall2AC ($name) - Send with URI: $uri";
+    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Send with URI: http://$uri";
 }
 
 sub TeslaPowerwall2AC_ErrorHandling($$$) {
@@ -314,8 +314,6 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
     my $name                = $hash->{NAME};
 
 
-
-    
     ### Begin Error Handling
     
     if( defined( $err ) ) {
@@ -328,6 +326,7 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
             
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
             
+            delete $hash->{actionQueue};
             return;
         }
     }
@@ -345,6 +344,7 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
     
         Log3 $name, 5, "TeslaPowerwall2AC ($name) - RequestERROR: received http code ".$param->{code}." without any data after requesting";
 
+        delete $hash->{actionQueue};
         return;
     }
 
@@ -359,6 +359,7 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
     
         Log3 $name, 3, "TeslaPowerwall2AC ($name) - statusRequestERROR: http error ".$param->{code};
 
+        delete $hash->{actionQueue};
         return;
 
         ### End Error Handling
@@ -369,7 +370,7 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
     
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
     
-    TeslaPowerwall2AC_ResponseProcessing($hash,$param->{path},$data);
+    TeslaPowerwall2AC_ResponseProcessing($hash,$param->{setCmd},$data);
 }
 
 sub TeslaPowerwall2AC_ResponseProcessing($$$) {
@@ -386,9 +387,9 @@ sub TeslaPowerwall2AC_ResponseProcessing($$$) {
 
         Log3 $name, 4, "TeslaPowerwall2AC ($name) - error while request: $@";
         readingsSingleUpdate($hash, "state", "json error", 1);
-        $readings{$path.'LastJsonError'}  = $@;
+        #$readings{$path.'LastJsonError'}  = $@;
 
-        return TeslaPowerwall2AC_WriteReadings($hash,$path,$readings);;
+        #return TeslaPowerwall2AC_WriteReadings($hash,$path,$readings);;
     }
     
     #### Verarbeitung der Readings zum passenden Path
