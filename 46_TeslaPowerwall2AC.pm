@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.0.21";
+my $version = "0.0.25";
 
 
 
@@ -92,7 +92,9 @@ my %paths = (   'statussoe'         => 'system_status/soe',
                 'aggregates'        => 'meters/aggregates',
                 'siteinfo'          => 'site_info',
                 'sitemaster'        => 'sitemaster',
-                'powerwalls'        => 'powerwalls'
+                'powerwalls'        => 'powerwalls',
+                'registration'      => 'customer/registration',
+                'status'            => 'status'
 );
 
 
@@ -235,24 +237,23 @@ sub TeslaPowerwall2AC_Get($@) {
     } elsif( $cmd eq 'sitemaster' ) {
     
         $arg    = lc($cmd);
+        
+    } elsif( $cmd eq 'registration' ) {
+    
+        $arg    = lc($cmd);
+
+    } elsif( $cmd eq 'status' ) {
+    
+        $arg    = lc($cmd);
 
     } else {
     
-        my $list = 'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg';
+        my $list = 'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg';
         
         return "Unknown argument $cmd, choose one of $list";
     }
 
-    #########
-    # zum testen
-        #my $json = '{"site":{"last_communication_time":"2017-10-13T19:16:23.896444247Z","instant_power":5.5513916015625,"instant_reactive_power":-197.36620712280273,"instant_apparent_power":197.44426469957278,"frequency":49.90053176879883,"energy_exported":159784,"energy_imported":183063,"instant_average_voltage":687.8249053955078,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0},"battery":{"last_communication_time":"2017-10-13T19:16:23.896606244Z","instant_power":2580,"instant_reactive_power":-50,"instant_apparent_power":2580.484450641003,"frequency":49.947,"energy_exported":90560,"energy_imported":109840,"instant_average_voltage":230.3,"instant_total_current":-64.9,"i_a_current":0,"i_b_current":0,"i_c_current":0},"load":{"last_communication_time":"2017-10-13T19:16:23.896444247Z","instant_power":2570.394101897115,"instant_reactive_power":-235.77139580030692,"instant_apparent_power":2581.184609853604,"frequency":49.90053176879883,"energy_exported":0,"energy_imported":200428,"instant_average_voltage":687.8249053955078,"instant_total_current":3.736988994923216,"i_a_current":0,"i_b_current":0,"i_c_current":0},"solar":{"last_communication_time":"2017-10-13T19:16:23.90554212Z","instant_power":-5.912493243813515,"instant_reactive_power":-6.48702609539032,"instant_apparent_power":8.777191117915539,"frequency":49.95012283325195,"energy_exported":235557,"energy_imported":39128,"instant_average_voltage":688.2974548339844,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0},"busway":{"last_communication_time":"0001-01-01T00:00:00Z","instant_power":0,"instant_reactive_power":0,"instant_apparent_power":0,"frequency":0,"energy_exported":0,"energy_imported":0,"instant_average_voltage":0,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0},"frequency":{"last_communication_time":"0001-01-01T00:00:00Z","instant_power":0,"instant_reactive_power":0,"instant_apparent_power":0,"frequency":0,"energy_exported":0,"energy_imported":0,"instant_average_voltage":0,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0}}';
-    
-        #my $json = '{"powerwalls":[{"PackagePartNumber":"1234567-89-E","PackageSerialNumber":"A12B3456789"}]}';
-        #TeslaPowerwall2AC_ResponseProcessing($hash,$arg,$json);
-
-
     unshift( @{$hash->{actionQueue}}, $arg );
-    
     TeslaPowerwall2AC_GetData($hash);
 
     return undef;
@@ -388,12 +389,12 @@ sub TeslaPowerwall2AC_ResponseProcessing($$$) {
 
     $decode_json    = eval{decode_json($json)};
     if($@){
-
         Log3 $name, 4, "TeslaPowerwall2AC ($name) - error while request: $@";
-        readingsSingleUpdate($hash, "state", "json error", 1);
-        #$readings{$path.'LastJsonError'}  = $@;
-
-        #return TeslaPowerwall2AC_WriteReadings($hash,$path,$readings);;
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, 'JSON Error', $@);
+        readingsBulkUpdate($hash, 'state', 'JSON error');
+        readingsEndUpdate($hash,1);
+        return;
     }
     
     #### Verarbeitung der Readings zum passenden Path
@@ -424,7 +425,7 @@ sub TeslaPowerwall2AC_WriteReadings($$$) {
     readingsBeginUpdate($hash);
     while( my ($r,$v) = each %{$readings} ) {
         readingsBulkUpdate($hash,$path.'-'.$r,$v);
-        readingsBulkUpdate($hash,$path.'-'.$r,sprintf("%.1f",$v) if($r eq 'percentage');
+        readingsBulkUpdate($hash,$path.'-'.$r,sprintf("%.1f",$v)) if($r eq 'percentage');
     }
 
     readingsBulkUpdateIfChanged($hash,'state','ready');
