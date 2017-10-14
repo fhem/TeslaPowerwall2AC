@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.0.18";
+my $version = "0.0.21";
 
 
 
@@ -229,6 +229,10 @@ sub TeslaPowerwall2AC_Get($@) {
         $arg    = lc($cmd);
 
     } elsif( $cmd eq 'powerwalls' ) {
+    
+        $arg    = lc($cmd);
+        
+    } elsif( $cmd eq 'sitemaster' ) {
     
         $arg    = lc($cmd);
 
@@ -419,7 +423,8 @@ sub TeslaPowerwall2AC_WriteReadings($$$) {
     
     readingsBeginUpdate($hash);
     while( my ($r,$v) = each %{$readings} ) {
-        readingsBulkUpdateIfChanged($hash,$path.'-'.$r,$v);
+        readingsBulkUpdate($hash,$path.'-'.$r,$v);
+        readingsBulkUpdate($hash,$path.'-'.$r,sprintf("%.1f",$v) if($r eq 'percentage');
     }
 
     readingsBulkUpdateIfChanged($hash,'state','ready');
