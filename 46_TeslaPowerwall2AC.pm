@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.1.5";
+my $version = "0.1.8";
 
 
 
@@ -282,7 +282,7 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
     my $name    = $hash->{NAME};
     
     
-    delete $hash->{actionQueue} = [] if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
+    delete $hash->{actionQueue} if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
     RemoveInternalTimer($hash);
     
     # ensure actionQueue exists
