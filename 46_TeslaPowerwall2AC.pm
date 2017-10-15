@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.1.2";
+my $version = "0.1.5";
 
 
 
@@ -274,6 +274,8 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
     my $name    = $hash->{NAME};
     
     
+    RemoveInternalTimer($hash);
+    
     # ensure actionQueue exists
     $hash->{actionQueue} = [] if( not defined($hash->{actionQueue}) );
     
@@ -437,6 +439,7 @@ sub TeslaPowerwall2AC_WriteReadings($$$) {
     }
     
     readingsBulkUpdate($hash,'batteryLevel',sprintf("%.1f",$readings->{percentage})) if( defined($readings->{percentage}) );
+    readingsBulkUpdate($hash,'batteryPower',sprintf("%.1f",$readings->{percentage}*0.135)) if( defined($readings->{percentage}) );
     readingsBulkUpdateIfChanged($hash,'state','ready');
     readingsEndUpdate($hash,1);
 }
