@@ -136,6 +136,9 @@ sub TeslaPowerwall2AC_Define($$) {
     $hash->{INTERVAL}       = 300;
     $hash->{PORT}           = 80;
     $hash->{VERSION}        = $version;
+    
+    # ensure actionQueue exists
+    $hash->{actionQueue} = [] if( not defined($hash->{actionQueue}) );
 
 
     $attr{$name}{room} = "Tesla" if( !defined( $attr{$name}{room} ) );
@@ -204,10 +207,15 @@ sub TeslaPowerwall2AC_Attr(@) {
     
     if( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
-            $hash->{INTERVAL} = $attrVal;
-            Log3 $name, 3, "TeslaPowerwall2AC ($name) - set interval to $attrVal";
-            TeslaPowerwall2AC_Timer_GetData($hash) if($init_done);
+            if( $attrVal < 180 ) {
+                Log3 $name, 3, "TeslaPowerwall2AC ($name) - interval too small, please use something >= 180 (sec), default is 300 (sec)";
+                return "interval too small, please use something >= 180 (sec), default is 300 (sec)";
             
+            } else {
+                $hash->{INTERVAL} = $attrVal;
+                Log3 $name, 3, "TeslaPowerwall2AC ($name) - set interval to $attrVal";
+                TeslaPowerwall2AC_Timer_GetData($hash) if($init_done);
+            }
         } elsif( $cmd eq "del" ) {
             $hash->{INTERVAL} = 300;
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - set interval to default";
@@ -222,10 +230,7 @@ sub TeslaPowerwall2AC_Get($@) {
     
     my ($hash, $name, $cmd) = @_;
     my $arg;
-    
-    
-    # ensure actionQueue exists
-    $hash->{actionQueue} = [] if( not defined($hash->{actionQueue}) );
+
 
     if( $cmd eq 'statusSOE' ) {
 
@@ -261,7 +266,10 @@ sub TeslaPowerwall2AC_Get($@) {
         
         return "Unknown argument $cmd, choose one of $list";
     }
-
+    
+    return 'There are still path commands in the action queue'
+    if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
+    
     unshift( @{$hash->{actionQueue}}, $arg );
     TeslaPowerwall2AC_GetData($hash);
 
@@ -274,6 +282,7 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
     my $name    = $hash->{NAME};
     
     
+    delete $hash->{actionQueue} = [] if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
     RemoveInternalTimer($hash);
     
     # ensure actionQueue exists
