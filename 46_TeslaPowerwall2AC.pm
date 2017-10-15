@@ -303,7 +303,7 @@ sub TeslaPowerwall2AC_GetData($) {
     my $uri             = $host . ':' . $port . '/api/' . $paths{$path};
 
 
-    readingsSingleUpdate($hash,'state','fetch data - ' . sclara(@{$hash->{actionQueue}}) . ' paths in actionQueue',1);
+    readingsSingleUpdate($hash,'state','fetch data - ' . scalar(@{$hash->{actionQueue}}) . ' paths in actionQueue',1);
 
     HttpUtils_NonblockingGet(
         {
