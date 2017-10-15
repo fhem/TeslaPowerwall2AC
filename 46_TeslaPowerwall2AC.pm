@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.0.25";
+my $version = "0.1.2";
 
 
 
@@ -126,8 +126,8 @@ sub TeslaPowerwall2AC_Define($$) {
     my @a = split( "[ \t][ \t]*", $def );
 
     
-    return "too few parameters: define <name> SmartPi <HOST>" if( @a != 3);
-    return "Cannot define a HEOS device. Perl modul $missingModul is missing." if ( $missingModul );
+    return "too few parameters: define <name> TeslaPowerwall2AC <HOST>" if( @a != 3);
+    return "Cannot define a TeslaPowerwall2AC device. Perl modul $missingModul is missing." if ( $missingModul );
     
     my $name                = $a[0];
     
@@ -173,36 +173,45 @@ sub TeslaPowerwall2AC_Undef($$) {
 sub TeslaPowerwall2AC_Attr(@) {
 
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
-    my $hash = $defs{$name};
-    
-    my $orig = $attrVal;
+    my $hash                                = $defs{$name};
+
 
     if( $attrName eq "disable" ) {
+        if( $cmd eq "set" and $attrVal eq "1" ) {
+            RemoveInternalTimer($hash);
+            readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+            Log3 $name, 3, "TeslaPowerwall2AC ($name) - disabled";
+        
+        } elsif( $cmd eq "del" ) {
+            readingsSingleUpdate ( $hash, "state", "active", 1 );
+            Log3 $name, 3, "TeslaPowerwall2AC ($name) - enabled";
+            TeslaPowerwall2AC_Timer_GetData($hash);
+        }
+    }
+    
+    if( $attrName eq "disabledForIntervals" ) {
         if( $cmd eq "set" ) {
-            if( $attrVal eq "0" ) {
-            
-                readingsSingleUpdate ( $hash, "state", "enabled", 1 );
-                Log3 $name, 3, "TeslaPowerwall2AC ($name) - enabled";
-            } else {
-
-                readingsSingleUpdate ( $hash, "state", "disabled", 1 );
-                Log3 $name, 3, "TeslaPowerwall2AC ($name) - disabled";
-            }
-            
-        } else {
-
-            readingsSingleUpdate ( $hash, "state", "enabled", 1 );
+            return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
+            unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
+            Log3 $name, 3, "TeslaPowerwall2AC ($name) - disabledForIntervals";
+            readingsSingleUpdate ( $hash, "state", "disabled for Intervals", 1 );
+        
+        } elsif( $cmd eq "del" ) {
+            readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - enabled";
         }
-        
-    } elsif( $attrName eq "interval" ) {
+    }
+    
+    if( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
-        
             $hash->{INTERVAL} = $attrVal;
+            Log3 $name, 3, "TeslaPowerwall2AC ($name) - set interval to $attrVal";
+            TeslaPowerwall2AC_Timer_GetData($hash) if($init_done);
             
-        } else {
-
+        } elsif( $cmd eq "del" ) {
             $hash->{INTERVAL} = 300;
+            Log3 $name, 3, "TeslaPowerwall2AC ($name) - set interval to default";
+            TeslaPowerwall2AC_Timer_GetData($hash);
         }
     }
     
@@ -294,7 +303,7 @@ sub TeslaPowerwall2AC_GetData($) {
     my $uri             = $host . ':' . $port . '/api/' . $paths{$path};
 
 
-    readingsSingleUpdate($hash,'state','fetch data',1);
+    readingsSingleUpdate($hash,'state','fetch data - ' . sclara(@{$hash->{actionQueue}}) . ' paths in actionQueue',1);
 
     HttpUtils_NonblockingGet(
         {
@@ -425,9 +434,9 @@ sub TeslaPowerwall2AC_WriteReadings($$$) {
     readingsBeginUpdate($hash);
     while( my ($r,$v) = each %{$readings} ) {
         readingsBulkUpdate($hash,$path.'-'.$r,$v);
-        readingsBulkUpdate($hash,$path.'-'.$r,sprintf("%.1f",$v)) if($r eq 'percentage');
     }
-
+    
+    readingsBulkUpdate($hash,'batteryLevel',sprintf("%.1f",$readings->{percentage})) if( defined($readings->{percentage}) );
     readingsBulkUpdateIfChanged($hash,'state','ready');
     readingsEndUpdate($hash,1);
 }
@@ -496,6 +505,11 @@ sub TeslaPowerwall2AC_ReadingsProcessing_Powerwalls($$) {
     </ul>
     <a name="TeslaPowerwall2ACget"></a>
     <b>get</b>
+    <ul>
+        <li> </li>
+    </ul>
+    <a name="TeslaPowerwall2ACattribute"></a>
+    <b>Attribute</b>
     <ul>
         <li> </li>
     </ul>
