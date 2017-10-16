@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.1.8";
+my $version = "0.1.11";
 
 
 
@@ -136,12 +136,10 @@ sub TeslaPowerwall2AC_Define($$) {
     $hash->{INTERVAL}       = 300;
     $hash->{PORT}           = 80;
     $hash->{VERSION}        = $version;
-    
-    # ensure actionQueue exists
-    $hash->{actionQueue} = [] if( not defined($hash->{actionQueue}) );
+    $hash->{actionQueue}    = [];
 
 
-    $attr{$name}{room} = "Tesla" if( !defined( $attr{$name}{room} ) );
+    $attr{$name}{room}      = "Tesla" if( !defined( $attr{$name}{room} ) );
     
     Log3 $name, 3, "TeslaPowerwall2AC ($name) - defined SmartPi Device with Host $host, Port $hash->{PORT} and Interval $hash->{INTERVAL}";
     
@@ -281,22 +279,20 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
     my $hash    = shift;
     my $name    = $hash->{NAME};
     
-    
-    delete $hash->{actionQueue} if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
+
     RemoveInternalTimer($hash);
     
-    # ensure actionQueue exists
-    $hash->{actionQueue} = [] if( not defined($hash->{actionQueue}) );
-    
-    if( not IsDisabled($name) ) {
-        while( my $obj = each %paths ) {
-            unshift( @{$hash->{actionQueue}}, $obj );
+    if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) == 0 ) {
+        if( not IsDisabled($name) ) {
+            while( my $obj = each %paths ) {
+                unshift( @{$hash->{actionQueue}}, $obj );
+            }
+        
+            TeslaPowerwall2AC_GetData($hash);
+        
+        } else {
+            readingsSingleUpdate($hash,'state','disabled',1);
         }
-        
-        TeslaPowerwall2AC_GetData($hash);
-        
-    } else {
-        readingsSingleUpdate($hash,'state','disabled',1);
     }
     
     InternalTimer( gettimeofday()+$hash->{INTERVAL}, 'TeslaPowerwall2AC_Timer_GetData', $hash );
@@ -351,7 +347,7 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
             
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
             
-            delete $hash->{actionQueue};
+            $hash->{actionQueue} = [];
             return;
         }
     }
@@ -369,7 +365,7 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
     
         Log3 $name, 5, "TeslaPowerwall2AC ($name) - RequestERROR: received http code ".$param->{code}." without any data after requesting";
 
-        delete $hash->{actionQueue};
+        $hash->{actionQueue} = [];
         return;
     }
 
@@ -384,7 +380,7 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
     
         Log3 $name, 3, "TeslaPowerwall2AC ($name) - statusRequestERROR: http error ".$param->{code};
 
-        delete $hash->{actionQueue};
+        $hash->{actionQueue} = [];
         return;
 
         ### End Error Handling
