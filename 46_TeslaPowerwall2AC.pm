@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.1.11";
+my $version = "0.1.14";
 
 
 
@@ -205,9 +205,9 @@ sub TeslaPowerwall2AC_Attr(@) {
     
     if( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
-            if( $attrVal < 180 ) {
-                Log3 $name, 3, "TeslaPowerwall2AC ($name) - interval too small, please use something >= 180 (sec), default is 300 (sec)";
-                return "interval too small, please use something >= 180 (sec), default is 300 (sec)";
+            if( $attrVal < 30 ) {
+                Log3 $name, 3, "TeslaPowerwall2AC ($name) - interval too small, please use something >= 30 (sec), default is 300 (sec)";
+                return "interval too small, please use something >= 30 (sec), default is 300 (sec)";
             
             } else {
                 $hash->{INTERVAL} = $attrVal;
@@ -310,7 +310,7 @@ sub TeslaPowerwall2AC_GetData($) {
     my $uri             = $host . ':' . $port . '/api/' . $paths{$path};
 
 
-    readingsSingleUpdate($hash,'state','fetch data - ' . scalar(@{$hash->{actionQueue}}) . ' paths in actionQueue',1);
+    readingsSingleUpdate($hash,'state','fetch data - ' . scalar(@{$hash->{actionQueue}}) . ' entries in the Queue',1);
 
     HttpUtils_NonblockingGet(
         {
@@ -341,8 +341,8 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
         if( $err ne "" ) {
         
             readingsBeginUpdate( $hash );
-            readingsBulkUpdateIfChanged ( $hash, 'state', $err, 1);
-            readingsBulkUpdateIfChanged( $hash, 'lastRequestError', $err, 1 );
+            readingsBulkUpdate( $hash, 'state', $err, 1);
+            readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
             readingsEndUpdate( $hash, 1 );
             
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
@@ -355,9 +355,9 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
     if( $data eq "" and exists( $param->{code} ) && $param->{code} ne 200 ) {
     
         readingsBeginUpdate( $hash );
-        readingsBulkUpdateIfChanged ( $hash, 'state', $param->{code}, 1 );
+        readingsBulkUpdate( $hash, 'state', $param->{code}, 1 );
 
-        readingsBulkUpdateIfChanged( $hash, 'lastRequestError', $param->{code}, 1 );
+        readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
 
         Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: ".$param->{code};
 
@@ -373,8 +373,8 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
     
         readingsBeginUpdate( $hash );
         
-        readingsBulkUpdateIfChanged( $hash, 'state', $param->{code}, 1 );
-        readingsBulkUpdateIfChanged( $hash, "lastRequestError", $param->{code}, 1 );
+        readingsBulkUpdate( $hash, 'state', $param->{code}, 1 );
+        readingsBulkUpdate( $hash, "lastRequestError", $param->{code}, 1 );
 
         readingsEndUpdate( $hash, 1 );
     
@@ -382,12 +382,11 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
 
         $hash->{actionQueue} = [];
         return;
-
         ### End Error Handling
     }
     
     TeslaPowerwall2AC_GetData($hash)
-    unless( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
+    if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
     
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
     
@@ -445,7 +444,8 @@ sub TeslaPowerwall2AC_WriteReadings($$$) {
     
     readingsBulkUpdate($hash,'batteryLevel',sprintf("%.1f",$readings->{percentage})) if( defined($readings->{percentage}) );
     readingsBulkUpdate($hash,'batteryPower',sprintf("%.1f",$readings->{percentage}*0.135)) if( defined($readings->{percentage}) );
-    readingsBulkUpdateIfChanged($hash,'state','ready');
+    readingsBulkUpdateIfChanged($hash,'actionQueue',scalar(@{$hash->{actionQueue}}) . ' entries in the Queue');
+    readingsBulkUpdateIfChanged($hash,'state',(defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) == 0 ? 'ready' : 'fetch data - ' . scalar(@{$hash->{actionQueue}}) . ' paths in actionQueue'));
     readingsEndUpdate($hash,1);
 }
 
@@ -457,10 +457,15 @@ sub TeslaPowerwall2AC_ReadingsProcessing_Aggregates($$) {
     my %readings;
     
     
-    while( my $obj = each %{$decode_json} ) {
-        while( my ($r,$v) = each %{$decode_json->{$obj}} ) {
-            $readings{$obj.'-'.$r}   = $v;
+    if( ref($decode_json) eq "HASH" ) {
+        while( my $obj = each %{$decode_json} ) {
+            while( my ($r,$v) = each %{$decode_json->{$obj}} ) {
+                $readings{$obj.'-'.$r}   = $v;
+            }
         }
+        
+    } else {
+        $readings{'error'} = 'aggregates response is not a Hash';
     }
     
     return \%readings;
@@ -484,6 +489,9 @@ sub TeslaPowerwall2AC_ReadingsProcessing_Powerwalls($$) {
                 }
             }
         }
+
+    } else {
+        $readings{'error'} = 'aggregates response is not a Array';
     }
     
     return \%readings;
