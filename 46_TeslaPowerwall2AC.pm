@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.1.14";
+my $version = "0.1.15";
 
 
 
@@ -76,6 +76,7 @@ sub TeslaPowerwall2AC_Attr(@);
 sub TeslaPowerwall2AC_Define($$);
 sub TeslaPowerwall2AC_Initialize($);
 sub TeslaPowerwall2AC_Get($@);
+sub TeslaPowerwall2AC_Notify($$);
 sub TeslaPowerwall2AC_GetData($);
 sub TeslaPowerwall2AC_Undef($$);
 sub TeslaPowerwall2AC_ResponseProcessing($$$);
@@ -106,6 +107,7 @@ sub TeslaPowerwall2AC_Initialize($) {
     $hash->{GetFn}      = "TeslaPowerwall2AC_Get";
     $hash->{DefFn}      = "TeslaPowerwall2AC_Define";
     $hash->{UndefFn}    = "TeslaPowerwall2AC_Undef";
+    $hash->{NotifyFn}   = "TeslaPowerwall2AC_Notify";
     
     $hash->{AttrFn}     = "TeslaPowerwall2AC_Attr";
     $hash->{AttrList}   = "interval ".
@@ -136,22 +138,13 @@ sub TeslaPowerwall2AC_Define($$) {
     $hash->{INTERVAL}       = 300;
     $hash->{PORT}           = 80;
     $hash->{VERSION}        = $version;
+    $hash->{NOTIFYDEV}      = "global";
     $hash->{actionQueue}    = [];
 
 
     $attr{$name}{room}      = "Tesla" if( !defined( $attr{$name}{room} ) );
     
     Log3 $name, 3, "TeslaPowerwall2AC ($name) - defined SmartPi Device with Host $host, Port $hash->{PORT} and Interval $hash->{INTERVAL}";
-    
-    
-    if( $init_done ) {
-        
-        TeslaPowerwall2AC_Timer_GetData($hash);
-            
-    } else {
-        
-        InternalTimer( gettimeofday()+15, "TeslaPowerwall2AC_Timer_GetData", $hash );
-    }
     
     $modules{TeslaPowerwall2AC}{defptr}{HOST} = $hash;
 
@@ -222,6 +215,22 @@ sub TeslaPowerwall2AC_Attr(@) {
     }
     
     return undef;
+}
+
+sub TeslaPowerwall2AC_Notify($$) {
+
+    my ($hash,$dev) = @_;
+    my $name = $hash->{NAME};
+    return if (IsDisabled($name));
+    
+    my $devname = $dev->{NAME};
+    my $devtype = $dev->{TYPE};
+    my $events = deviceEvents($dev,1);
+    return if (!$events);
+
+
+    TeslaPowerwall2AC_Timer_GetData($hash) if( grep /^INITIALIZED$/,@{$events} );
+    return;
 }
 
 sub TeslaPowerwall2AC_Get($@) {
