@@ -186,7 +186,7 @@ sub TeslaPowerwall2AC_Attr(@) {
             return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
             unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - disabledForIntervals";
-            readingsSingleUpdate ( $hash, "state", "disabled for Intervals", 1 );
+            readingsSingleUpdate ( $hash, "state", "disabled", 1 );
         
         } elsif( $cmd eq "del" ) {
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - enabled";
