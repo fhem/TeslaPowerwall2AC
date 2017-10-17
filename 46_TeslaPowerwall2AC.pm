@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.1.15";
+my $version = "0.1.23";
 
 
 
@@ -142,7 +142,7 @@ sub TeslaPowerwall2AC_Define($$) {
     $hash->{actionQueue}    = [];
 
 
-    $attr{$name}{room}      = "Tesla" if( !defined( $attr{$name}{room} ) );
+    $attr{$name}{room}                      = "Tesla" if( !defined( $attr{$name}{room} ) );
     
     Log3 $name, 3, "TeslaPowerwall2AC ($name) - defined SmartPi Device with Host $host, Port $hash->{PORT} and Interval $hash->{INTERVAL}";
     
@@ -177,9 +177,7 @@ sub TeslaPowerwall2AC_Attr(@) {
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - disabled";
         
         } elsif( $cmd eq "del" ) {
-            readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - enabled";
-            TeslaPowerwall2AC_Timer_GetData($hash);
         }
     }
     
@@ -191,8 +189,8 @@ sub TeslaPowerwall2AC_Attr(@) {
             readingsSingleUpdate ( $hash, "state", "disabled for Intervals", 1 );
         
         } elsif( $cmd eq "del" ) {
-            readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - enabled";
+            readingsSingleUpdate( $hash, "state", "active", 1 );
         }
     }
     
@@ -203,11 +201,13 @@ sub TeslaPowerwall2AC_Attr(@) {
                 return "interval too small, please use something >= 30 (sec), default is 300 (sec)";
             
             } else {
+                RemoveInternalTimer($hash);
                 $hash->{INTERVAL} = $attrVal;
                 Log3 $name, 3, "TeslaPowerwall2AC ($name) - set interval to $attrVal";
-                TeslaPowerwall2AC_Timer_GetData($hash) if($init_done);
+                TeslaPowerwall2AC_Timer_GetData($hash);
             }
         } elsif( $cmd eq "del" ) {
+            RemoveInternalTimer($hash);
             $hash->{INTERVAL} = 300;
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - set interval to default";
             TeslaPowerwall2AC_Timer_GetData($hash);
@@ -229,7 +229,8 @@ sub TeslaPowerwall2AC_Notify($$) {
     return if (!$events);
 
 
-    TeslaPowerwall2AC_Timer_GetData($hash) if( grep /^INITIALIZED$/,@{$events} );
+    TeslaPowerwall2AC_Timer_GetData($hash) if( grep /^INITIALIZED$/,@{$events}
+                                                or grep /^DELETEATTR.$name.disable$/,@{$events} );
     return;
 }
 
@@ -287,11 +288,9 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
 
     my $hash    = shift;
     my $name    = $hash->{NAME};
-    
 
-    RemoveInternalTimer($hash);
-    
-    if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) == 0 ) {
+
+    if( $init_done and defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) == 0 ) {
         if( not IsDisabled($name) ) {
             while( my $obj = each %paths ) {
                 unshift( @{$hash->{actionQueue}}, $obj );
