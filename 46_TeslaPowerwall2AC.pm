@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.1.23";
+my $version = "0.2.0";
 
 
 
@@ -514,7 +514,7 @@ sub TeslaPowerwall2AC_ReadingsProcessing_Powerwalls($$) {
 =pod
 
 =item device
-=item summary    
+=item summary       Modul to retrieves data from a Tesla Powerwall 2AC
 =item summary_DE 
 
 =begin html
@@ -522,20 +522,54 @@ sub TeslaPowerwall2AC_ReadingsProcessing_Powerwalls($$) {
 <a name="TeslaPowerwall2AC"></a>
 <h3>Tesla Powerwall 2 AC</h3>
 <ul>
+    <u><b>TeslaPowerwall2AC - Retrieves data from a Tesla Powerwall 2AC System</b></u>
+    <br>
+    With this module it is possible to read the data from a Tesla Powerwall 2AC and to set it as reading.
+    <br><br>
+    <a name="TeslaPowerwall2ACdefine"></a>
+    <b>Define</b>
+    <ul><br>
+        <code>define &lt;name&gt; TeslaPowerwall2AC &lt;HOST&gt;</code>
+    <br><br>
+    Example:
+    <ul><br>
+        <code>define myPowerWall TeslaPowerwall2AC 192.168.1.34</code><br>
+    </ul>
+    <br>
+    This statement creates a Device with the name myPowerWall and the Host IP 192.168.1.34.<br>
+    After the device has been created, the current data of Powerwall is automatically read from the device.
+    </ul>
+    <br><br>
     <a name="TeslaPowerwall2ACreadings"></a>
     <b>Readings</b>
     <ul>
-        <li> </li>
+        <li>actionQueue     - information about the entries in the action queue</li>
+        <li>aggregates-*    - readings of the /api/meters/aggregates response</li>
+        <li>batteryLevel    - battery level in percent</li>
+        <li>batteryPower    - battery capacity in kWh</li>
+        <li>powerwalls-*    - readings of the /api/powerwalls response</li>
+        <li>registration-*  - readings of the /api/customer/registration response</li>
+        <li>siteinfo-*      - readings of the /api/site_info response</li>
+        <li>sitemaster-*    - readings of the /api/sitemaster response</li>
+        <li>state           - information about internel modul processes</li>
+        <li>status-*        - readings of the /api/status response</li>
+        <li>statussoe-*     - readings of the /api/system_status/soe response</li>
     </ul>
     <a name="TeslaPowerwall2ACget"></a>
     <b>get</b>
     <ul>
-        <li> </li>
+        <li>aggregates      - fetch data from url path /api/meters/aggregates</li>
+        <li>powerwalls      - fetch data from url path /api/powerwalls</li>
+        <li>registration    - fetch data from url path /api/customer/registration</li>
+        <li>siteinfo        - fetch data from url path /api/site_info</li>
+        <li>sitemaster      - fetch data from url path /api/sitemaster</li>
+        <li>status          - fetch data from url path /api/status</li>
+        <li>statussoe       - fetch data from url path /api/system_status/soe</li>
     </ul>
     <a name="TeslaPowerwall2ACattribute"></a>
     <b>Attribute</b>
     <ul>
-        <li> </li>
+        <li>interval - interval in seconds for automatically fetch data (default 300)</li>
     </ul>
 </ul>
 
