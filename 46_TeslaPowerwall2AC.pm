@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.2.4";
+my $version = "0.4.0";
 
 
 
@@ -496,7 +496,7 @@ sub TeslaPowerwall2AC_ReadingsProcessing_Powerwalls($$) {
             if( ref($powerwall) eq "HASH" ) {
             
                 while( my ($r,$v) = each %{$powerwall} ) {
-                    $readings{'wall'.$i.'_'.$r}   = $v;
+                    $readings{'wall_'.$i.'_'.$r}   = $v;
                 }
                 
                 $i++;
