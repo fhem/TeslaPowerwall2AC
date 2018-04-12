@@ -66,7 +66,7 @@ use HttpUtils;
 eval "use JSON;1" or $missingModul .= "JSON ";
 
 
-my $version = "0.4.0";
+my $version = "0.5.99";
 
 
 
@@ -76,8 +76,9 @@ sub TeslaPowerwall2AC_Attr(@);
 sub TeslaPowerwall2AC_Define($$);
 sub TeslaPowerwall2AC_Initialize($);
 sub TeslaPowerwall2AC_Get($@);
+sub TeslaPowerwall2AC_Set($@);
 sub TeslaPowerwall2AC_Notify($$);
-sub TeslaPowerwall2AC_GetData($);
+sub TeslaPowerwall2AC_Write($);
 sub TeslaPowerwall2AC_Undef($$);
 sub TeslaPowerwall2AC_ResponseProcessing($$$);
 sub TeslaPowerwall2AC_ReadingsProcessing_Aggregates($$);
@@ -85,6 +86,7 @@ sub TeslaPowerwall2AC_ReadingsProcessing_Powerwalls($$);
 sub TeslaPowerwall2AC_ErrorHandling($$$);
 sub TeslaPowerwall2AC_WriteReadings($$$);
 sub TeslaPowerwall2AC_Timer_GetData($);
+sub TeslaPowerwall2AC_CreateUri($$);
 
 
 
@@ -93,9 +95,12 @@ my %paths = (   'statussoe'         => 'system_status/soe',
                 'aggregates'        => 'meters/aggregates',
                 'siteinfo'          => 'site_info',
                 'sitemaster'        => 'sitemaster',
+                'powerwallsstop'    => 'sitemaster/stop',
+                'powerwallsrun'     => 'sitemaster/run',
                 'powerwalls'        => 'powerwalls',
                 'registration'      => 'customer/registration',
-                'status'            => 'status'
+                'status'            => 'status',
+                'login'             => 'login/Basic'
 );
 
 
@@ -105,6 +110,7 @@ sub TeslaPowerwall2AC_Initialize($) {
     
     # Consumer
     $hash->{GetFn}      = "TeslaPowerwall2AC_Get";
+    $hash->{SetFn}      = "TeslaPowerwall2AC_Set";
     $hash->{DefFn}      = "TeslaPowerwall2AC_Define";
     $hash->{UndefFn}    = "TeslaPowerwall2AC_Undef";
     $hash->{NotifyFn}   = "TeslaPowerwall2AC_Notify";
@@ -136,13 +142,13 @@ sub TeslaPowerwall2AC_Define($$) {
     my $host                = $a[2];
     $hash->{HOST}           = $host;
     $hash->{INTERVAL}       = 300;
-    $hash->{PORT}           = 80;
+    $hash->{PORT}           = 1080;
     $hash->{VERSION}        = $version;
     $hash->{NOTIFYDEV}      = "global";
     $hash->{actionQueue}    = [];
 
 
-    $attr{$name}{room}                      = "Tesla" if( !defined( $attr{$name}{room} ) );
+    CommandAttr(undef,$name . ' room Tesla') if( AttrVal($name,'room','none') eq 'none' );
     
     Log3 $name, 3, "TeslaPowerwall2AC ($name) - defined TeslaPowerwall2AC Device with Host $host, Port $hash->{PORT} and Interval $hash->{INTERVAL}";
     
@@ -281,8 +287,31 @@ sub TeslaPowerwall2AC_Get($@) {
     if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
     
     unshift( @{$hash->{actionQueue}}, $arg );
-    TeslaPowerwall2AC_GetData($hash);
+    TeslaPowerwall2AC_Write($hash);
 
+    return undef;
+}
+
+sub TeslaPowerwall2AC_Set($@) {
+    
+    my ($hash, $name, $cmd, @args) = @_;
+    my $arg;
+
+
+    if( $cmd eq 'powerwalls' ) {
+    
+        $arg    = lc($cmd.$args[0]);
+
+    } else {
+    
+        my $list = 'powerwalls:stop';
+        
+        return "Unknown argument $cmd, choose one of $list";
+    }
+    
+    unshift( @{$hash->{actionQueue}}, $arg );
+    TeslaPowerwall2AC_Write($hash);
+    
     return undef;
 }
 
@@ -298,7 +327,7 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
                 unshift( @{$hash->{actionQueue}}, $obj );
             }
         
-            TeslaPowerwall2AC_GetData($hash);
+            TeslaPowerwall2AC_Write($hash);
         
         } else {
             readingsSingleUpdate($hash,'state','disabled',1);
@@ -309,16 +338,13 @@ sub TeslaPowerwall2AC_Timer_GetData($) {
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Call InternalTimer TeslaPowerwall2AC_Timer_GetData";
 }
 
-sub TeslaPowerwall2AC_GetData($) {
+sub TeslaPowerwall2AC_Write($) {
 
     my ($hash)          = @_;
-    
     my $name            = $hash->{NAME};
-    my $host            = $hash->{HOST};
-    my $port            = $hash->{PORT};
-    my $path            = pop( @{$hash->{actionQueue}} );
-    my $uri             = $host . ':' . $port . '/api/' . $paths{$path};
-
+    
+    
+    my ($uri,$method,$header,$data,$path) = TeslaPowerwall2AC_CreateUri($hash,pop(@{$hash->{actionQueue}}));
 
     readingsSingleUpdate($hash,'state','fetch data - ' . scalar(@{$hash->{actionQueue}}) . ' entries in the Queue',1);
 
@@ -326,7 +352,9 @@ sub TeslaPowerwall2AC_GetData($) {
         {
             url         => "http://" . $uri,
             timeout     => 5,
-            method      => 'GET',
+            method      => $method,
+            data        => $data,
+            header      => $header,
             hash        => $hash,
             setCmd      => $path,
             doTrigger   => 1,
@@ -395,7 +423,7 @@ sub TeslaPowerwall2AC_ErrorHandling($$$) {
         ### End Error Handling
     }
     
-    TeslaPowerwall2AC_GetData($hash)
+    TeslaPowerwall2AC_Write($hash)
     if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
     
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
@@ -429,7 +457,10 @@ sub TeslaPowerwall2AC_ResponseProcessing($$$) {
         
     } elsif( $path eq 'powerwalls') {
         $readings = TeslaPowerwall2AC_ReadingsProcessing_Powerwalls($hash,$decode_json);
-        
+    
+    } elsif( $path eq 'login') {
+        return $hash->{TOKEN} = $decode_json->{token};
+
     } else {
         $readings = $decode_json;
     }
@@ -510,6 +541,31 @@ sub TeslaPowerwall2AC_ReadingsProcessing_Powerwalls($$) {
     }
     
     return \%readings;
+}
+
+sub TeslaPowerwall2AC_CreateUri($$) {
+
+    my ($hash,$path)    = @_;
+    my $host            = $hash->{HOST};
+    my $port            = $hash->{PORT};
+    my $method          = 'GET';
+    my $uri;
+    my $header;
+    my $data;
+
+    my $uri             = $host . ':' . $port . '/api/' . $paths{$path};
+
+
+    if( $path eq 'sitemasterrun' ) {
+        $header = 'Authorization: Bearer' . $hash->{TOKEN};
+    
+    } elsif( $path eq 'login' ) {
+        $method = 'POST';
+        $header = 'Content-Type: application/json';
+        $data   = '{"username":"","password":"S' . ReadingsVal($hash->{NAME},'powerwalls-wall_0_PackageSerialNumber',0) . '","force_sm_off":false}';
+    }
+
+    return($uri,$method,$header,$data,$path);
 }
 
 
