@@ -385,7 +385,7 @@ sub Set($@) {
 
         my $list = '';
         $list .= 'powerwalls:run,stop'
-          if ( AttrVal( $name, 'devel', 'none' ) == 1 );
+          if ( AttrVal( $name, 'devel', 0 ) == 1 );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
     }
