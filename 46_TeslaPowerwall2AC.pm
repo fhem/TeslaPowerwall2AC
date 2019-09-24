@@ -172,15 +172,17 @@ my %paths = (
     'statussoe'      => 'system_status/soe',
     'aggregates'     => 'meters/aggregates',
     'meterssite'     => 'meters/site',
-    'meterssolar'          => 'meters/solar',
+    'meterssolar'    => 'meters/solar',
     'siteinfo'       => 'site_info',
+    'sitename'       => 'site_info/site_name',
     'sitemaster'     => 'sitemaster',
     'powerwallsstop' => 'sitemaster/stop',
     'powerwallsrun'  => 'sitemaster/run',
     'powerwalls'     => 'powerwalls',
     'registration'   => 'customer/registration',
     'status'         => 'status',
-    'login'          => 'login/Basic'
+    'login'          => 'login/Basic',
+    'gridstatus'     => 'system_status/grid_status',
 );
 
 sub Initialize($) {
@@ -441,22 +443,7 @@ sub Write($) {
         1
     );
 
-    #### temporär
-#     HttpUtils_NonblockingGet(
-#         {
-#             url       => 'http://' . $uri,
-#             timeout   => 5,
-#             method    => $method,
-#             data      => $data,
-#             header    => $header,
-#             hash      => $hash,
-#             setCmd    => $path,
-#             doTrigger => 1,
-#             callback  => \&ErrorHandling,
-#         }
-#     );
-
-    ErrorHandling(
+    HttpUtils_NonblockingGet(
         {
             url       => 'http://' . $uri,
             timeout   => 5,
@@ -467,10 +454,25 @@ sub Write($) {
             setCmd    => $path,
             doTrigger => 1,
             callback  => \&ErrorHandling,
-        },
-        undef,
-        '{"none": "none"}'
+        }
     );
+
+#     #### temporär
+#     ErrorHandling(
+#         {
+#             url       => 'http://' . $uri,
+#             timeout   => 5,
+#             method    => $method,
+#             data      => $data,
+#             header    => $header,
+#             hash      => $hash,
+#             setCmd    => $path,
+#             doTrigger => 1,
+#             callback  => \&ErrorHandling,
+#         },
+#         undef,
+#         '{"none": "none"}'
+#     );
 
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Send with URI: http://$uri";
 }
@@ -479,239 +481,240 @@ sub ErrorHandling($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
-    my $path = $param->{setCmd};   # temporär
+#     my $path = $param->{setCmd};   # temporär
     
     
-    #### temporär
-    if ( $path eq 'statussoe' ) {
-        $data = '{"percentage":69.1675560298826}';
-    }
-    elsif ( $path eq 'aggregates' ) {
-        $data = '{
-        "site":{
-            "last_communication_time":"2018-04-02T16:11:41.885377469-07:00",
-            "instant_power":-21.449996948242188,
-            "instant_reactive_power":-138.8300018310547,
-            "instant_apparent_power":140.47729986545957,
-            "frequency":60.060001373291016,
-            "energy_exported":1136916.6875890202,
-            "energy_imported":3276432.6625890196,
-            "instant_average_voltage":239.81999969482422,
-            "instant_total_current":0,
-            "i_a_current":0,
-            "i_b_current":0,
-            "i_c_current":0
-        },
-        "battery":{
-            "last_communication_time":"2018-04-02T16:11:41.89022247-07:00",
-            "instant_power":-2350,
-            "instant_reactive_power":0,
-            "instant_apparent_power":2350,
-            "frequency":60.033,
-            "energy_exported":1169030,
-            "energy_imported":1638140,
-            "instant_average_voltage":239.10000000000002,
-            "instant_total_current":45.8,
-            "i_a_current":0,
-            "i_b_current":0,
-            "i_c_current":0
-        },
-        "load":{
-            "last_communication_time":"2018-04-02T16:11:41.885377469-07:00",
-            "instant_power":1546.2712597712405,
-            "instant_reactive_power":-71.43153973801415,
-            "instant_apparent_power":1547.920305979569,
-            "frequency":60.060001373291016,
-            "energy_exported":0,
-            "energy_imported":7191016.994444443,
-            "instant_average_voltage":239.81999969482422,
-            "instant_total_current":6.44763264839839,
-            "i_a_current":0,
-            "i_b_current":0,
-            "i_c_current":0
-        },
-        "solar":{
-            "last_communication_time":"2018-04-02T16:11:41.885541803-07:00",
-            "instant_power":3906.1700439453125,
-            "instant_reactive_power":53.26999855041504,
-            "instant_apparent_power":3906.533259164868,
-            "frequency":60.060001373291016,
-            "energy_exported":5534272.949724403,
-            "energy_imported":13661.930279959455,
-            "instant_average_voltage":239.8699951171875,
-            "instant_total_current":0,
-            "i_a_current":0,
-            "i_b_current":0,
-            "i_c_current":0
-        },
-        "busway":{
-            "last_communication_time":"0001-01-01T00:00:00Z",
-            "instant_power":0,
-            "instant_reactive_power":0,
-            "instant_apparent_power":0,
-            "frequency":0,
-            "energy_exported":0,
-            "energy_imported":0,
-            "instant_average_voltage":0,
-            "instant_total_current":0,
-            "i_a_current":0,
-            "i_b_current":0,
-            "i_c_current":0
-        },
-        "frequency":{
-            "last_communication_time":"0001-01-01T00:00:00Z",
-            "instant_power":0,
-            "instant_reactive_power":0,
-            "instant_apparent_power":0,
-            "frequency":0,
-            "energy_exported":0,
-            "energy_imported":0,
-            "instant_average_voltage":0,
-            "instant_total_current":0,
-            "i_a_current":0,
-            "i_b_current":0,
-            "i_c_current":0
-        },
-        "generator":{
-            "last_communication_time":"0001-01-01T00:00:00Z",
-            "instant_power":0,
-            "instant_reactive_power":0,
-            "instant_apparent_power":0,
-            "frequency":0,
-            "energy_exported":0,
-            "energy_imported":0,
-            "instant_average_voltage":0,
-            "instant_total_current":0,
-            "i_a_current":0,
-            "i_b_current":0,
-            "i_c_current":0
-        }
-    }';
-    }
-    elsif ( $path eq 'siteinfo' ) {
-        $data = '{"site":{"last_communication_time":"2019-09-22T00:21:15.389963162-07:00","instant_power":24.451171875,"instant_reactive_power":53.17060422897339,"instant_apparent_power":58.52326853598416,"frequency":49.99971389770508,"energy_exported":8317850.641600119,"energy_imported":3906677.3213223405,"instant_average_voltage":228.2313995361328,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"battery":{"last_communication_time":"2019-09-22T00:21:15.501660598-07:00","instant_power":1350,"instant_reactive_power":-30,"instant_apparent_power":1350.3332921912279,"frequency":49.994,"energy_exported":3816030,"energy_imported":4422670,"instant_average_voltage":235,"instant_total_current":-31.8,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"load":{"last_communication_time":"2019-09-22T00:21:15.389963162-07:00","instant_power":5728.583274805815,"instant_reactive_power":-175.17854151916174,"instant_apparent_power":5731.261105358374,"frequency":49.99971389770508,"energy_exported":0,"energy_imported":13885698.406388888,"instant_average_voltage":228.2313995361328,"instant_total_current":25.0998911037168,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"solar":{"last_communication_time":"2019-09-22T00:21:15.506420255-07:00","instant_power":4363.2269287109375,"instant_reactive_power":-196.4273910522461,"instant_apparent_power":4367.646156842822,"frequency":49.99971389770508,"energy_exported":18947820.8881397,"energy_imported":44309.16147303224,"instant_average_voltage":227.83099365234375,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000}}';
-    }
-    elsif ( $path eq 'sitemaster' ) {
-        $data = '{"running":true,"uptime":"166594s,","connected_to_tesla":true}';
-    }
-    elsif ( $path eq 'powerwalls' ) {
-        $data = '{"powerwalls":[{"PackagePartNumber":"1092170-03-E","PackageSerialNumber":"T1234567890"},{"PackagePartNumber":"1092170-03-E","PackageSerialNumber":"T1234567891"}],"has_sync":true}';
-    }
-    elsif ( $path eq 'status' ) {
-        $data = '{"start_time":"2018-03-16 19:08:46 +0800","up_time_seconds":"402h8m19.937911668s","is_new":false,"version":"1.15.0\n","git_hash":"dc337851c6cad15a7e9c7223d60fff719eb8da4d\n"}';
-    }
-    elsif ( $path eq 'meterssite' ) {
-        $data = '[
-            {
-                "id":0,
-                "location":"site",
-                "type":"neurio_tcp",
-                "cts":[
-                    true,
-                    true,
-                    false,
-                    false
-                ],
-                "inverted":[
-                    false,
-                    false,
-                    false,
-                    false
-                ],
-                "connection":{
-                    "ip_address":"Neurio-39546",
-                    "port":443,
-                    "short_id":"39546",
-                    "device_serial":"OBB3364102752",
-                    "neurio_connected":true,
-                    "https_conf":{
-                        "client_cert":"/etc/site/certs/neurio/neurio.crt",
-                        "client_key":"/etc/site/certs/neurio/neurio.key",
-                        "server_ca_cert":"/etc/site/certs/neurio/neurio-ca-chain.cert.pem",
-                        "max_idle_conns_per_host":1
-                    }
-                },
-                "Cached_readings":{
-                    "last_communication_time":"2018-06-10T16:51:46.187715089+01:00",
-                    "instant_power":13.94000026769936,
-                    "instant_reactive_power":14.070000305771828,
-                    "instant_apparent_power":19.80627466405224,
-                    "frequency":49.95000076293945,
-                    "energy_exported":3724.253888912031,
-                    "energy_imported":26003.843888912033,
-                    "instant_average_voltage":247.52999755740166,
-                    "instant_total_current":0,
-                    "i_a_current":0,
-                    "i_b_current":0,
-                    "i_c_current":0,
-                    "v_l1n":247.3300018310547,
-                    "v_l2n":0.2199999988079071,
-                    "serial_number":"0x000004714B008720",
-                    "version":"Tesla-0.0.7"
-                }
-            }
-        ]';
-    }
-    elsif ( $path eq 'meterssolar' ) {
-        $data = '[
-            {
-                "id":0,
-                "location":"solar",
-                "type":"neurio_tcp",
-                "cts":[
-                    false,
-                    false,
-                    false,
-                    true
-                ],
-                "inverted":[
-                    false,
-                    false,
-                    false,
-                    false
-                ],
-                "connection":{
-                    "ip_address":"Neurio-39546",
-                    "port":443,
-                    "short_id":"39546",
-                    "device_serial":"OBB3364102752",
-                    "neurio_connected":true,
-                    "https_conf":{
-                        "client_cert":"/etc/site/certs/neurio/neurio.crt",
-                        "client_key":"/etc/site/certs/neurio/neurio.key",
-                        "server_ca_cert":"/etc/site/certs/neurio/neurio-ca-chain.cert.pem",
-                        "max_idle_conns_per_host":1
-                    }
-                },
-                "Cached_readings":{
-                    "last_communication_time":"2018-06-10T16:52:57.788560639+01:00",
-                    "instant_power":318.8599853515625,
-                    "instant_reactive_power":129.94000244140625,
-                    "instant_apparent_power":344.3197561756678,
-                    "frequency":49.95000076293945,
-                    "energy_exported":3.8174999999938235,
-                    "energy_imported":125317.00444444444,
-                    "instant_average_voltage":246.82000732421875,
-                    "instant_total_current":0,
-                    "i_a_current":0,
-                    "i_b_current":0,
-                    "i_c_current":0,
-                    "v_l1n":246.8800048828125,
-                    "serial_number":"0x000004714B008720",
-                    "version":"Tesla-0.0.7"
-                }
-            }
-        ]';
-    }
+#     #### temporär
+#     if ( $path eq 'statussoe' ) {
+#         $data = '{"percentage":69.1675560298826}';
+#     }
+#     elsif ( $path eq 'aggregates' ) {
+#         $data = '{
+#             "site":{
+#                 "last_communication_time":"2018-04-02T16:11:41.885377469-07:00",
+#                 "instant_power":-21.449996948242188,
+#                 "instant_reactive_power":-138.8300018310547,
+#                 "instant_apparent_power":140.47729986545957,
+#                 "frequency":60.060001373291016,
+#                 "energy_exported":1136916.6875890202,
+#                 "energy_imported":3276432.6625890196,
+#                 "instant_average_voltage":239.81999969482422,
+#                 "instant_total_current":0,
+#                 "i_a_current":0,
+#                 "i_b_current":0,
+#                 "i_c_current":0
+#             },
+#             "battery":{
+#                 "last_communication_time":"2018-04-02T16:11:41.89022247-07:00",
+#                 "instant_power":-2350,
+#                 "instant_reactive_power":0,
+#                 "instant_apparent_power":2350,
+#                 "frequency":60.033,
+#                 "energy_exported":1169030,
+#                 "energy_imported":1638140,
+#                 "instant_average_voltage":239.10000000000002,
+#                 "instant_total_current":45.8,
+#                 "i_a_current":0,
+#                 "i_b_current":0,
+#                 "i_c_current":0
+#             },
+#             "load":{
+#                 "last_communication_time":"2018-04-02T16:11:41.885377469-07:00",
+#                 "instant_power":1546.2712597712405,
+#                 "instant_reactive_power":-71.43153973801415,
+#                 "instant_apparent_power":1547.920305979569,
+#                 "frequency":60.060001373291016,
+#                 "energy_exported":0,
+#                 "energy_imported":7191016.994444443,
+#                 "instant_average_voltage":239.81999969482422,
+#                 "instant_total_current":6.44763264839839,
+#                 "i_a_current":0,
+#                 "i_b_current":0,
+#                 "i_c_current":0
+#             },
+#             "solar":{
+#                 "last_communication_time":"2018-04-02T16:11:41.885541803-07:00",
+#                 "instant_power":3906.1700439453125,
+#                 "instant_reactive_power":53.26999855041504,
+#                 "instant_apparent_power":3906.533259164868,
+#                 "frequency":60.060001373291016,
+#                 "energy_exported":5534272.949724403,
+#                 "energy_imported":13661.930279959455,
+#                 "instant_average_voltage":239.8699951171875,
+#                 "instant_total_current":0,
+#                 "i_a_current":0,
+#                 "i_b_current":0,
+#                 "i_c_current":0
+#             },
+#             "busway":{
+#                 "last_communication_time":"0001-01-01T00:00:00Z",
+#                 "instant_power":0,
+#                 "instant_reactive_power":0,
+#                 "instant_apparent_power":0,
+#                 "frequency":0,
+#                 "energy_exported":0,
+#                 "energy_imported":0,
+#                 "instant_average_voltage":0,
+#                 "instant_total_current":0,
+#                 "i_a_current":0,
+#                 "i_b_current":0,
+#                 "i_c_current":0
+#             },
+#             "frequency":{
+#                 "last_communication_time":"0001-01-01T00:00:00Z",
+#                 "instant_power":0,
+#                 "instant_reactive_power":0,
+#                 "instant_apparent_power":0,
+#                 "frequency":0,
+#                 "energy_exported":0,
+#                 "energy_imported":0,
+#                 "instant_average_voltage":0,
+#                 "instant_total_current":0,
+#                 "i_a_current":0,
+#                 "i_b_current":0,
+#                 "i_c_current":0
+#             },
+#             "generator":{
+#                 "last_communication_time":"0001-01-01T00:00:00Z",
+#                 "instant_power":0,
+#                 "instant_reactive_power":0,
+#                 "instant_apparent_power":0,
+#                 "frequency":0,
+#                 "energy_exported":0,
+#                 "energy_imported":0,
+#                 "instant_average_voltage":0,
+#                 "instant_total_current":0,
+#                 "i_a_current":0,
+#                 "i_b_current":0,
+#                 "i_c_current":0
+#             }
+#         }';
+#     }
+#     elsif ( $path eq 'siteinfo' ) {
+#         $data = '{"site":{"last_communication_time":"2019-09-22T00:21:15.389963162-07:00","instant_power":24.451171875,"instant_reactive_power":53.17060422897339,"instant_apparent_power":58.52326853598416,"frequency":49.99971389770508,"energy_exported":8317850.641600119,"energy_imported":3906677.3213223405,"instant_average_voltage":228.2313995361328,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"battery":{"last_communication_time":"2019-09-22T00:21:15.501660598-07:00","instant_power":1350,"instant_reactive_power":-30,"instant_apparent_power":1350.3332921912279,"frequency":49.994,"energy_exported":3816030,"energy_imported":4422670,"instant_average_voltage":235,"instant_total_current":-31.8,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"load":{"last_communication_time":"2019-09-22T00:21:15.389963162-07:00","instant_power":5728.583274805815,"instant_reactive_power":-175.17854151916174,"instant_apparent_power":5731.261105358374,"frequency":49.99971389770508,"energy_exported":0,"energy_imported":13885698.406388888,"instant_average_voltage":228.2313995361328,"instant_total_current":25.0998911037168,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"solar":{"last_communication_time":"2019-09-22T00:21:15.506420255-07:00","instant_power":4363.2269287109375,"instant_reactive_power":-196.4273910522461,"instant_apparent_power":4367.646156842822,"frequency":49.99971389770508,"energy_exported":18947820.8881397,"energy_imported":44309.16147303224,"instant_average_voltage":227.83099365234375,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000}}';
+#     }
+#     elsif ( $path eq 'sitemaster' ) {
+#         $data = '{"running":true,"uptime":"166594s,","connected_to_tesla":true}';
+#     }
+#     elsif ( $path eq 'powerwalls' ) {
+#         $data = '{"powerwalls":[{"PackagePartNumber":"1092170-03-E","PackageSerialNumber":"T1234567890"},{"PackagePartNumber":"1092170-03-E","PackageSerialNumber":"T1234567891"}],"has_sync":true}';
+#     }
+#     elsif ( $path eq 'status' ) {
+#         $data = '{"start_time":"2018-03-16 19:08:46 +0800","up_time_seconds":"402h8m19.937911668s","is_new":false,"version":"1.15.0\n","git_hash":"dc337851c6cad15a7e9c7223d60fff719eb8da4d\n"}';
+#     }
+#     elsif ( $path eq 'meterssite' ) {
+#         $data = '[
+#             {
+#                 "id":0,
+#                 "location":"site",
+#                 "type":"neurio_tcp",
+#                 "cts":[
+#                     true,
+#                     true,
+#                     false,
+#                     false
+#                 ],
+#                 "inverted":[
+#                     false,
+#                     false,
+#                     false,
+#                     false
+#                 ],
+#                 "connection":{
+#                     "ip_address":"Neurio-39546",
+#                     "port":443,
+#                     "short_id":"39546",
+#                     "device_serial":"OBB3364102752",
+#                     "neurio_connected":true,
+#                     "https_conf":{
+#                         "client_cert":"/etc/site/certs/neurio/neurio.crt",
+#                         "client_key":"/etc/site/certs/neurio/neurio.key",
+#                         "server_ca_cert":"/etc/site/certs/neurio/neurio-ca-chain.cert.pem",
+#                         "max_idle_conns_per_host":1
+#                     }
+#                 },
+#                 "Cached_readings":{
+#                     "last_communication_time":"2018-06-10T16:51:46.187715089+01:00",
+#                     "instant_power":13.94000026769936,
+#                     "instant_reactive_power":14.070000305771828,
+#                     "instant_apparent_power":19.80627466405224,
+#                     "frequency":49.95000076293945,
+#                     "energy_exported":3724.253888912031,
+#                     "energy_imported":26003.843888912033,
+#                     "instant_average_voltage":247.52999755740166,
+#                     "instant_total_current":0,
+#                     "i_a_current":0,
+#                     "i_b_current":0,
+#                     "i_c_current":0,
+#                     "v_l1n":247.3300018310547,
+#                     "v_l2n":0.2199999988079071,
+#                     "serial_number":"0x000004714B008720",
+#                     "version":"Tesla-0.0.7"
+#                 }
+#             }
+#         ]';
+#     }
+#     elsif ( $path eq 'meterssolar' ) {
+#         $data = '[
+#             {
+#                 "id":0,
+#                 "location":"solar",
+#                 "type":"neurio_tcp",
+#                 "cts":[
+#                     false,
+#                     false,
+#                     false,
+#                     true
+#                 ],
+#                 "inverted":[
+#                     false,
+#                     false,
+#                     false,
+#                     false
+#                 ],
+#                 "connection":{
+#                     "ip_address":"Neurio-39546",
+#                     "port":443,
+#                     "short_id":"39546",
+#                     "device_serial":"OBB3364102752",
+#                     "neurio_connected":true,
+#                     "https_conf":{
+#                         "client_cert":"/etc/site/certs/neurio/neurio.crt",
+#                         "client_key":"/etc/site/certs/neurio/neurio.key",
+#                         "server_ca_cert":"/etc/site/certs/neurio/neurio-ca-chain.cert.pem",
+#                         "max_idle_conns_per_host":1
+#                     }
+#                 },
+#                 "Cached_readings":{
+#                     "last_communication_time":"2018-06-10T16:52:57.788560639+01:00",
+#                     "instant_power":318.8599853515625,
+#                     "instant_reactive_power":129.94000244140625,
+#                     "instant_apparent_power":344.3197561756678,
+#                     "frequency":49.95000076293945,
+#                     "energy_exported":3.8174999999938235,
+#                     "energy_imported":125317.00444444444,
+#                     "instant_average_voltage":246.82000732421875,
+#                     "instant_total_current":0,
+#                     "i_a_current":0,
+#                     "i_b_current":0,
+#                     "i_c_current":0,
+#                     "v_l1n":246.8800048828125,
+#                     "serial_number":"0x000004714B008720",
+#                     "version":"Tesla-0.0.7"
+#                 }
+#             }
+#         ]';
+#     }
+#     
+#     elsif ( $path eq 'gridstatus' ) {
+#         $data = '{"grid_status":"SystemGridConnected"}';
+#     }
+#     elsif ( $path eq 'sitename' ) {
+#         $data = '{"site_name":"Home Energy Gateway","timezone":"America/Los_Angeles"}';
+#     }
     
     
-    
-    
-    
-    
-    
-    
-    
+
 
     ### Begin Error Handling
 
@@ -1147,7 +1150,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.0",
+  "version": "v0.6.100",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
