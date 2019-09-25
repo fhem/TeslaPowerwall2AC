@@ -40,14 +40,14 @@
 #######
 #######
 #  URLs zum Abrufen diverser Daten
-# http://<ip-Powerwall>/api/system_status/soe
-# http://<ip-Powerwall>/api/meters/aggregates
-# http://<ip-Powerwall>/api/site_info
-# http://<ip-Powerwall>/api/sitemaster
-# http://<ip-Powerwall>/api/powerwalls
-# http://<ip-Powerwall>/api/networks
-# http://<ip-Powerwall>/api/system/networks
-# http://<ip-Powerwall>/api/operation
+# https://<ip-Powerwall>/api/system_status/soe
+# https://<ip-Powerwall>/api/meters/aggregates
+# https://<ip-Powerwall>/api/site_info
+# https://<ip-Powerwall>/api/sitemaster
+# https://<ip-Powerwall>/api/powerwalls
+# https://<ip-Powerwall>/api/networks
+# https://<ip-Powerwall>/api/system/networks
+# https://<ip-Powerwall>/api/operation
 #
 ##
 ##
@@ -218,7 +218,6 @@ sub Define($$) {
     my $host = $a[2];
     $hash->{HOST}        = $host;
     $hash->{INTERVAL}    = 300;
-    $hash->{PORT}        = 1080;
     $hash->{VERSION}     = version->parse($VERSION)->normal;
     $hash->{NOTIFYDEV}   = "global,$name";
     $hash->{actionQueue} = [];
@@ -226,7 +225,7 @@ sub Define($$) {
     CommandAttr( undef, $name . ' room Tesla' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
     Log3 $name, 3,
-"TeslaPowerwall2AC ($name) - defined TeslaPowerwall2AC Device with Host $host, Port $hash->{PORT} and Interval $hash->{INTERVAL}";
+"TeslaPowerwall2AC ($name) - defined TeslaPowerwall2AC Device with Host $host and Interval $hash->{INTERVAL}";
 
     return undef;
 }
@@ -445,7 +444,7 @@ sub Write($) {
 
     HttpUtils_NonblockingGet(
         {
-            url       => 'http://' . $uri,
+            url       => 'https://' . $uri,
             timeout   => 5,
             method    => $method,
             data      => $data,
@@ -1035,13 +1034,12 @@ sub ReadingsProcessing_Meters_Solar($$) {
 sub CreateUri($$) {
     my ( $hash, $path ) = @_;
     my $host   = $hash->{HOST};
-    my $port   = $hash->{PORT};
     my $method = 'GET';
     my $uri;
     my $header;
     my $data;
 
-    $uri = $host . ':' . $port . '/api/' . $paths{$path};
+    $uri = $host . ':' . '/api/' . $paths{$path};
 
     if ( $path eq 'sitemasterrun' ) {
         $header = 'Authorization: Bearer' . $hash->{TOKEN};
