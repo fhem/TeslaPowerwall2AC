@@ -179,7 +179,7 @@ my %paths = (
     'powerwallsstop' => 'sitemaster/stop',
     'powerwallsrun'  => 'sitemaster/run',
     'powerwalls'     => 'powerwalls',
-#     'registration'   => 'customer/registration',
+    'registration'   => 'customer/registration',
     'status'         => 'status',
     'login'          => 'login/Basic',
     'gridstatus'     => 'system_status/grid_status',
@@ -1039,7 +1039,7 @@ sub CreateUri($$) {
     my $header;
     my $data;
 
-    $uri = $host . ':' . '/api/' . $paths{$path};
+    $uri = $host . '/api/' . $paths{$path};
 
     if ( $path eq 'sitemasterrun' ) {
         $header = 'Authorization: Bearer' . $hash->{TOKEN};
