@@ -179,7 +179,7 @@ my %paths = (
     'powerwallsstop' => 'sitemaster/stop',
     'powerwallsrun'  => 'sitemaster/run',
     'powerwalls'     => 'powerwalls',
-    'registration'   => 'customer/registration',
+#     'registration'   => 'customer/registration',
     'status'         => 'status',
     'login'          => 'login/Basic',
     'gridstatus'     => 'system_status/grid_status',
@@ -1148,7 +1148,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.100",
+  "version": "v0.6.102",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
