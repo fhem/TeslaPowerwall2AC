@@ -787,12 +787,8 @@ sub ErrorHandling($$$) {
 
         readingsEndUpdate( $hash, 1 );
 
-        Log3 $name, 3,
-          "TeslaPowerwall2AC ($name) - statusRequestERROR: http error "
-          . $param->{code};
-
-        $hash->{actionQueue} = [];
-        return;
+        #         $hash->{actionQueue} = [];
+        #         return;
         ### End Error Handling
     }
 
@@ -824,6 +820,12 @@ sub ResponseProcessing($$$) {
         readingsEndUpdate( $hash, 1 );
         return;
     }
+
+    return
+      if (  defined( $decode_json->{error} )
+        and $decode_json->{error}
+        and defined( $decode_json->{code} )
+        and $decode_json->{code} );
 
     #### Verarbeitung der Readings zum passenden Path
 
