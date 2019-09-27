@@ -482,6 +482,13 @@ sub ErrorHandling($$$) {
     my $name = $hash->{NAME};
 #     my $path = $param->{setCmd};   # temporär
     
+    print('TESLA DEBUG - ResponseString: ' . Dumper $data);
+    print('TESLA DEBUG - Error: ' . $err . "\n")
+      unless ($err);
+    
+    
+    
+    
     
 #     #### temporär
 #     if ( $path eq 'statussoe' ) {
@@ -728,7 +735,7 @@ sub ErrorHandling($$$) {
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
 
             $hash->{actionQueue} = [];
-            return;
+#             return;
         }
     }
 
@@ -750,7 +757,7 @@ sub ErrorHandling($$$) {
           . " without any data after requesting";
 
         $hash->{actionQueue} = [];
-        return;
+#         return;
     }
 
     if ( ( $data =~ /Error/i ) and exists( $param->{code} ) ) {
@@ -767,7 +774,7 @@ sub ErrorHandling($$$) {
           . $param->{code};
 
         $hash->{actionQueue} = [];
-        return;
+#         return;
         ### End Error Handling
     }
 
@@ -777,7 +784,7 @@ sub ErrorHandling($$$) {
 
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
 
-    ResponseProcessing( $hash, $param->{setCmd}, $data );
+#     ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
 
 sub ResponseProcessing($$$) {
