@@ -456,22 +456,22 @@ sub Write($) {
         }
     );
 
-#     #### temporär
-#     ErrorHandling(
-#         {
-#             url       => 'http://' . $uri,
-#             timeout   => 5,
-#             method    => $method,
-#             data      => $data,
-#             header    => $header,
-#             hash      => $hash,
-#             setCmd    => $path,
-#             doTrigger => 1,
-#             callback  => \&ErrorHandling,
-#         },
-#         undef,
-#         '{"none": "none"}'
-#     );
+    #     #### temporär
+    #     ErrorHandling(
+    #         {
+    #             url       => 'http://' . $uri,
+    #             timeout   => 5,
+    #             method    => $method,
+    #             data      => $data,
+    #             header    => $header,
+    #             hash      => $hash,
+    #             setCmd    => $path,
+    #             doTrigger => 1,
+    #             callback  => \&ErrorHandling,
+    #         },
+    #         undef,
+    #         '{"none": "none"}'
+    #     );
 
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Send with URI: http://$uri";
 }
@@ -480,16 +480,9 @@ sub ErrorHandling($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
-#     my $path = $param->{setCmd};   # temporär
-    
-    print('TESLA DEBUG - ResponseString: ' . Dumper $data);
-    print('TESLA DEBUG - Error: ' . $err . "\n")
-      unless ($err);
-    
-    
-    
-    
-    
+
+    #     my $path = $param->{setCmd};   # temporär
+
 #     #### temporär
 #     if ( $path eq 'statussoe' ) {
 #         $data = '{"percentage":69.1675560298826}';
@@ -711,16 +704,13 @@ sub ErrorHandling($$$) {
 #             }
 #         ]';
 #     }
-#     
+#
 #     elsif ( $path eq 'gridstatus' ) {
 #         $data = '{"grid_status":"SystemGridConnected"}';
 #     }
 #     elsif ( $path eq 'sitename' ) {
 #         $data = '{"site_name":"Home Energy Gateway","timezone":"America/Los_Angeles"}';
 #     }
-    
-    
-
 
     ### Begin Error Handling
 
@@ -735,7 +725,7 @@ sub ErrorHandling($$$) {
             Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
 
             $hash->{actionQueue} = [];
-#             return;
+            return;
         }
     }
 
@@ -757,7 +747,7 @@ sub ErrorHandling($$$) {
           . " without any data after requesting";
 
         $hash->{actionQueue} = [];
-#         return;
+        return;
     }
 
     if ( ( $data =~ /Error/i ) and exists( $param->{code} ) ) {
@@ -774,7 +764,35 @@ sub ErrorHandling($$$) {
           . $param->{code};
 
         $hash->{actionQueue} = [];
-#         return;
+        return;
+    }
+
+    if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$# ) {
+
+        readingsBeginUpdate($hash);
+
+        readingsBulkUpdate( $hash, 'state', $1, 1 );
+        readingsBulkUpdate(
+            $hash,
+            'lastRequestError',
+            'Path: '
+              . $param->{setCmd} . ' '
+              . $1
+              . ' - Error: '
+              . $2
+              . ' Messages: '
+              . $3,
+            1
+        );
+
+        readingsEndUpdate( $hash, 1 );
+
+        Log3 $name, 3,
+          "TeslaPowerwall2AC ($name) - statusRequestERROR: http error "
+          . $param->{code};
+
+        $hash->{actionQueue} = [];
+        return;
         ### End Error Handling
     }
 
@@ -784,7 +802,11 @@ sub ErrorHandling($$$) {
 
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
 
-#     ResponseProcessing( $hash, $param->{setCmd}, $data );
+    print( 'TESLA DEBUG - ResponseString: ' . Dumper $data);
+    print( 'TESLA DEBUG - Error: ' . $err . "\n" )
+      unless ($err);
+
+    #     ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
 
 sub ResponseProcessing($$$) {
@@ -943,46 +965,54 @@ sub ReadingsProcessing_Meters_Site($$) {
     my $name = $hash->{NAME};
     my %readings;
 
-#     print('Ausgabe1: ' . Dumper $decode_json . "\n");
-    
-    if ( ref( $decode_json ) eq 'ARRAY'
-        and scalar( @{ $decode_json } ) > 0 )
+    #     print('Ausgabe1: ' . Dumper $decode_json . "\n");
+
+    if ( ref($decode_json) eq 'ARRAY'
+        and scalar( @{$decode_json} ) > 0 )
     {
-        if ( ref($decode_json->[0]) eq 'HASH' ) {
-            while ( my $obj = each %{$decode_json->[0]} ) {
-#                 print('Ausgabe2: ' . Dumper $obj . "\n");
-                if ( ref($decode_json->[0]->{$obj}) eq 'ARRAY'
-                  or ref($decode_json->[0]->{$obj}) eq 'HASH' )
+        if ( ref( $decode_json->[0] ) eq 'HASH' ) {
+            while ( my $obj = each %{ $decode_json->[0] } ) {
+
+                #                 print('Ausgabe2: ' . Dumper $obj . "\n");
+                if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
+                    or ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
                 {
-                    if ( ref($decode_json->[0]->{$obj}) eq 'HASH' ) {
-#                         print('Ausgabe3: ' . Dumper $obj . "\n");
-                        while ( my ( $r, $v ) = each %{ $decode_json->[0]->{$obj} } ) {
+                    if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
+
+             #                         print('Ausgabe3: ' . Dumper $obj . "\n");
+                        while ( my ( $r, $v ) =
+                            each %{ $decode_json->[0]->{$obj} } )
+                        {
                             if ( ref($v) ne 'HASH' ) {
+
 #                                 print('Ausgabe4: ' . $obj . '-' . $r . ' = ' . $v . "\n");
                                 $readings{ $obj . '-' . $r } = $v;
                             }
                             else {
 #                                 print('Ausgabe5: ' . Dumper $decode_json->[0]->{$obj}->{$r} . "\n");
-                                while ( my ( $r2, $v2 ) = each %{ $decode_json->[0]->{$obj}->{$r} } ) {
+                                while ( my ( $r2, $v2 ) =
+                                    each %{ $decode_json->[0]->{$obj}->{$r} } )
+                                {
 #                                     print('Ausgabe6: ' . $obj . '-' . $r2 . ' = ' . $v2 . "\n");
-                                    $readings{ $obj . '-' . $r . '-' . $r2 } = $v2;
+                                    $readings{ $obj . '-' . $r . '-' . $r2 } =
+                                      $v2;
                                 }
                             }
                         }
                     }
-                    elsif ( ref($decode_json->[0]->{$obj}) eq 'ARRAY' ) {
+                    elsif ( ref( $decode_json->[0]->{$obj} ) eq 'ARRAY' ) {
 
                     }
                 }
                 else {
 #                     print('Ausgabe7: ' . Dumper $decode_json->[0]->{$obj} . "\n");
-                    $readings{ $obj } = $decode_json->[0]->{$obj};
+                    $readings{$obj} = $decode_json->[0]->{$obj};
                 }
             }
         }
     }
     else {
-#         print('Ausgabe8: ' . "\n");
+        #         print('Ausgabe8: ' . "\n");
         $readings{'error'} = 'metes site response is not a Array';
     }
 
@@ -994,44 +1024,52 @@ sub ReadingsProcessing_Meters_Solar($$) {
     my $name = $hash->{NAME};
     my %readings;
 
-    if ( ref( $decode_json ) eq 'ARRAY'
-        and scalar( @{ $decode_json } ) > 0 )
+    if ( ref($decode_json) eq 'ARRAY'
+        and scalar( @{$decode_json} ) > 0 )
     {
-        if ( ref($decode_json->[0]) eq 'HASH' ) {
-            while ( my $obj = each %{$decode_json->[0]} ) {
-#                 print('Ausgabe2: ' . Dumper $obj . "\n");
-                if ( ref($decode_json->[0]->{$obj}) eq 'ARRAY'
-                  or ref($decode_json->[0]->{$obj}) eq 'HASH' )
+        if ( ref( $decode_json->[0] ) eq 'HASH' ) {
+            while ( my $obj = each %{ $decode_json->[0] } ) {
+
+                #                 print('Ausgabe2: ' . Dumper $obj . "\n");
+                if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
+                    or ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
                 {
-                    if ( ref($decode_json->[0]->{$obj}) eq 'HASH' ) {
-#                         print('Ausgabe3: ' . Dumper $obj . "\n");
-                        while ( my ( $r, $v ) = each %{ $decode_json->[0]->{$obj} } ) {
+                    if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
+
+             #                         print('Ausgabe3: ' . Dumper $obj . "\n");
+                        while ( my ( $r, $v ) =
+                            each %{ $decode_json->[0]->{$obj} } )
+                        {
                             if ( ref($v) ne 'HASH' ) {
+
 #                                 print('Ausgabe4: ' . $obj . '-' . $r . ' = ' . $v . "\n");
                                 $readings{ $obj . '-' . $r } = $v;
                             }
                             else {
 #                                 print('Ausgabe5: ' . Dumper $decode_json->[0]->{$obj}->{$r} . "\n");
-                                while ( my ( $r2, $v2 ) = each %{ $decode_json->[0]->{$obj}->{$r} } ) {
+                                while ( my ( $r2, $v2 ) =
+                                    each %{ $decode_json->[0]->{$obj}->{$r} } )
+                                {
 #                                     print('Ausgabe6: ' . $obj . '-' . $r2 . ' = ' . $v2 . "\n");
-                                    $readings{ $obj . '-' . $r . '-' . $r2 } = $v2;
+                                    $readings{ $obj . '-' . $r . '-' . $r2 } =
+                                      $v2;
                                 }
                             }
                         }
                     }
-                    elsif ( ref($decode_json->[0]->{$obj}) eq 'ARRAY' ) {
+                    elsif ( ref( $decode_json->[0]->{$obj} ) eq 'ARRAY' ) {
 
                     }
                 }
                 else {
 #                     print('Ausgabe7: ' . Dumper $decode_json->[0]->{$obj} . "\n");
-                    $readings{ $obj } = $decode_json->[0]->{$obj};
+                    $readings{$obj} = $decode_json->[0]->{$obj};
                 }
             }
         }
     }
     else {
-#         print('Ausgabe8: ' . "\n");
+        #         print('Ausgabe8: ' . "\n");
         $readings{'error'} = 'metes solar response is not a Array';
     }
 
@@ -1155,7 +1193,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.102",
+  "version": "v0.6.103",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
