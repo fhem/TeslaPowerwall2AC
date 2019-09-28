@@ -181,7 +181,7 @@ my %paths = (
     'powerwalls'     => 'powerwalls',
     'registration'   => 'customer/registration',
     'status'         => 'status',
-    'login'          => 'login/Basic',
+#     'login'          => 'login/Basic',
     'gridstatus'     => 'system_status/grid_status',
 );
 
@@ -480,6 +480,12 @@ sub ErrorHandling($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
+    
+    print( 'TESLA DEBUG1 - Path: ' . $param->{setCmd} );
+    print( 'TESLA DEBUG1 - ResponseString: ' . Dumper $data );
+    print( 'TESLA DEBUG1 - Error: ' . $err . "\n" )
+      unless (  defined($err)
+            and $err);
 
     #     my $path = $param->{setCmd};   # temporär
 
@@ -798,9 +804,10 @@ sub ErrorHandling($$$) {
 
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
 
-    print( 'TESLA DEBUG - ResponseString: ' . Dumper $data);
-    print( 'TESLA DEBUG - Error: ' . $err . "\n" )
-      unless ($err);
+    print( 'TESLA DEBUG2 - ResponseString: ' . Dumper $data );
+    print( 'TESLA DEBUG2 - Error: ' . $err . "\n" )
+      unless (  defined($err)
+            and $err);
 
     #     ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
