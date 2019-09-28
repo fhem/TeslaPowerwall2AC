@@ -176,8 +176,8 @@ my %paths = (
     'siteinfo'       => 'site_info',
     'sitename'       => 'site_info/site_name',
     'sitemaster'     => 'sitemaster',
-    'powerwallsstop' => 'sitemaster/stop',
-    'powerwallsrun'  => 'sitemaster/run',
+#     'powerwallsstop' => 'sitemaster/stop',
+#     'powerwallsrun'  => 'sitemaster/run',
     'powerwalls'     => 'powerwalls',
     'registration'   => 'customer/registration',
     'status'         => 'status',
@@ -481,8 +481,8 @@ sub ErrorHandling($$$) {
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
     
-    print( 'TESLA DEBUG1 - Path: ' . $param->{setCmd} );
-    print( 'TESLA DEBUG1 - ResponseString: ' . Dumper $data );
+    print( 'TESLA DEBUG1 - Path: ' . $param->{setCmd} . "\n" );
+    print( 'TESLA DEBUG1 - ResponseString: ' . Dumper $data . "\n" );
     print( 'TESLA DEBUG1 - Error: ' . $err . "\n" )
       unless (  defined($err)
             and $err);
@@ -1202,7 +1202,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.110",
+  "version": "v0.6.111",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
