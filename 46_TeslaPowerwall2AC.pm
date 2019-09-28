@@ -473,7 +473,7 @@ sub Write($) {
     #         '{"none": "none"}'
     #     );
 
-    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Send with URI: http://$uri";
+    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Send with URI: https://$uri";
 }
 
 sub ErrorHandling($$$) {
@@ -1195,7 +1195,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.103",
+  "version": "v0.6.110",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
