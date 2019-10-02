@@ -630,7 +630,8 @@ sub ResponseProcessing($$$) {
     }
 
     return
-      if (  defined( $decode_json->{error} )
+      if (  ref($decode_json) eq 'HASH'
+        and defined( $decode_json->{error} )
         and $decode_json->{error}
         and defined( $decode_json->{code} )
         and $decode_json->{code} );
