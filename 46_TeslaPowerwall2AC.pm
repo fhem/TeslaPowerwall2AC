@@ -557,22 +557,22 @@ sub ErrorHandling($$$) {
         return;
     }
 
-    if ( ( $data =~ /Error/i ) and exists( $param->{code} ) ) {
-
-        readingsBeginUpdate($hash);
-
-        readingsBulkUpdate( $hash, 'state',            $param->{code}, 1 );
-        readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
-
-        readingsEndUpdate( $hash, 1 );
-
-        Log3 $name, 3,
-          "TeslaPowerwall2AC ($name) - statusRequestERROR: http error "
-          . $param->{code};
-
-        $hash->{actionQueue} = [];
-        return;
-    }
+#     if ( ( $data =~ /Error/i ) and exists( $param->{code} ) ) {
+# 
+#         readingsBeginUpdate($hash);
+# 
+#         readingsBulkUpdate( $hash, 'state',            $param->{code}, 1 );
+#         readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
+# 
+#         readingsEndUpdate( $hash, 1 );
+# 
+#         Log3 $name, 3,
+#           "TeslaPowerwall2AC ($name) - statusRequestERROR: http error "
+#           . $param->{code};
+# 
+#         $hash->{actionQueue} = [];
+#         return;
+#     }
 
     if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$# ) {
 
