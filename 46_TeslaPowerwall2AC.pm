@@ -486,7 +486,7 @@ sub ErrorHandling($$$) {
     print( 'TESLA DEBUG1 - Error: ' . $err . "\n" )
       if (  defined($err) and $err);
     print( 'TESLA DEBUG1 - Code: ' . $param->{code} . "\n" )
-      if ( exists( $param->{code} );
+      if ( exists($param->{code}) );
 
 #         my $path = $param->{setCmd};   # temporär
 
