@@ -169,20 +169,21 @@ GP_Export(
 );
 
 my %paths = (
-    'statussoe'      => 'system_status/soe',
-    'aggregates'     => 'meters/aggregates',
-    'meterssite'     => 'meters/site',
-    'meterssolar'    => 'meters/solar',
-    'siteinfo'       => 'site_info',
-    'sitename'       => 'site_info/site_name',
-    'sitemaster'     => 'sitemaster',
-#     'powerwallsstop' => 'sitemaster/stop',
-#     'powerwallsrun'  => 'sitemaster/run',
-    'powerwalls'     => 'powerwalls',
-    'registration'   => 'customer/registration',
-    'status'         => 'status',
-    'login'          => 'login/Basic',
-    'gridstatus'     => 'system_status/grid_status',
+    'statussoe'   => 'system_status/soe',
+    'aggregates'  => 'meters/aggregates',
+    'meterssite'  => 'meters/site',
+    'meterssolar' => 'meters/solar',
+    'siteinfo'    => 'site_info',
+    'sitename'    => 'site_info/site_name',
+    'sitemaster'  => 'sitemaster',
+
+    #     'powerwallsstop' => 'sitemaster/stop',
+    #     'powerwallsrun'  => 'sitemaster/run',
+    'powerwalls'   => 'powerwalls',
+    'registration' => 'customer/registration',
+    'status'       => 'status',
+    'login'        => 'login/Basic',
+    'gridstatus'   => 'system_status/grid_status',
 );
 
 sub Initialize($) {
@@ -520,17 +521,16 @@ sub ErrorHandling($$$) {
             1
         );
 
-        readingsEndUpdate( $hash, 1 );        
+        readingsEndUpdate( $hash, 1 );
     }
     #### End Error Handling
 
-    InternalTimer( gettimeofday() + 3,
-        'TeslaPowerwall2AC_Write', $hash )
+    InternalTimer( gettimeofday() + 3, 'TeslaPowerwall2AC_Write', $hash )
       if ( defined( $hash->{actionQueue} )
         and scalar( @{ $hash->{actionQueue} } ) > 0 );
 
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
- 
+
     ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
 
