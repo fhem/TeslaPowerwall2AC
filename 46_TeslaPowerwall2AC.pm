@@ -456,23 +456,6 @@ sub Write($) {
         }
     );
 
-    #     #### temporär
-#         ErrorHandling(
-#             {
-#                 url       => 'http://' . $uri,
-#                 timeout   => 5,
-#                 method    => $method,
-#                 data      => $data,
-#                 header    => $header,
-#                 hash      => $hash,
-#                 setCmd    => $path,
-#                 doTrigger => 1,
-#                 callback  => \&ErrorHandling,
-#             },
-#             undef,
-#             '{"none": "none"}'
-#         );
-
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Send with URI: https://$uri";
 }
 
@@ -480,38 +463,6 @@ sub ErrorHandling($$$) {
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
-
-#         my $path = $param->{setCmd};   # temporär
-
-#     #### temporär
-#     if ( $path eq 'statussoe' ) {
-#         $data = '{"percentage":69.1675560298826}';
-#     }
-#     elsif ( $path eq 'aggregates' ) {
-#         $data = '{"site":{"last_communication_time":"2019-09-28T01:18:08.789827048-07:00","instant_power":19.98255157470703,"instant_reactive_power":-250.38783884048462,"instant_apparent_power":251.18394098079662,"frequency":49.99971389770508,"energy_exported":8343253.28995022,"energy_imported":3918908.6732835528,"instant_average_voltage":229.0396474202474,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"battery":{"last_communication_time":"2019-09-28T01:18:08.790449046-07:00","instant_power":-480,"instant_reactive_power":0,"instant_apparent_power":480,"frequency":49.989000000000004,"energy_exported":3864090,"energy_imported":4474680,"instant_average_voltage":231.20000000000002,"instant_total_current":9.4,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"load":{"last_communication_time":"2019-09-28T01:18:08.789827048-07:00","instant_power":763.0661269030993,"instant_reactive_power":-139.88348897886516,"instant_apparent_power":775.7817376787089,"frequency":49.99971389770508,"energy_exported":0,"energy_imported":14000112.403333334,"instant_average_voltage":229.0396474202474,"instant_total_current":3.331589685444317,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"solar":{"last_communication_time":"2019-09-28T01:18:08.79021638-07:00","instant_power":1223.3705749511719,"instant_reactive_power":111.61752128601074,"instant_apparent_power":1228.4518853884324,"frequency":49.99971389770508,"energy_exported":19079749.482032932,"energy_imported":44702.4620329314,"instant_average_voltage":228.65799967447916,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000}}';
-#     }
-#     elsif ( $path eq 'siteinfo' ) {
-#         $data = '{"site":{"last_communication_time":"2019-09-22T00:21:15.389963162-07:00","instant_power":24.451171875,"instant_reactive_power":53.17060422897339,"instant_apparent_power":58.52326853598416,"frequency":49.99971389770508,"energy_exported":8317850.641600119,"energy_imported":3906677.3213223405,"instant_average_voltage":228.2313995361328,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"battery":{"last_communication_time":"2019-09-22T00:21:15.501660598-07:00","instant_power":1350,"instant_reactive_power":-30,"instant_apparent_power":1350.3332921912279,"frequency":49.994,"energy_exported":3816030,"energy_imported":4422670,"instant_average_voltage":235,"instant_total_current":-31.8,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"load":{"last_communication_time":"2019-09-22T00:21:15.389963162-07:00","instant_power":5728.583274805815,"instant_reactive_power":-175.17854151916174,"instant_apparent_power":5731.261105358374,"frequency":49.99971389770508,"energy_exported":0,"energy_imported":13885698.406388888,"instant_average_voltage":228.2313995361328,"instant_total_current":25.0998911037168,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000},"solar":{"last_communication_time":"2019-09-22T00:21:15.506420255-07:00","instant_power":4363.2269287109375,"instant_reactive_power":-196.4273910522461,"instant_apparent_power":4367.646156842822,"frequency":49.99971389770508,"energy_exported":18947820.8881397,"energy_imported":44309.16147303224,"instant_average_voltage":227.83099365234375,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0,"timeout":1500000000}}';
-#     }
-#     elsif ( $path eq 'sitemaster' ) {
-#         $data = '{"running":true,"uptime":"166594s,","connected_to_tesla":true}';
-#     }
-#     elsif ( $path eq 'powerwalls' ) {
-#         $data = '{"powerwalls":[{"PackagePartNumber":"1092170-03-E","PackageSerialNumber":"T1234567890"},{"PackagePartNumber":"1092170-03-E","PackageSerialNumber":"T1234567891"}],"has_sync":true}';
-#     }
-#     elsif ( $path eq 'status' ) {
-#         $data = '{"start_time":"2019-09-23 23:59:36 +0800","up_time_seconds":"97h18m32.139207194s","is_new":false,"version":"1.40.2","git_hash":"14f7c1769ec307bba2ea62355a09d01c8e58988c+"}';
-#     }
-#     elsif ( $path eq 'meterssite' ) {
-#         $data = '[{"id":0,"location":"site","type":"neurio_mb","cts":[true,true,true,false],"inverted":[false,false,false,false],"connection":{"serial_port":"/dev/ttymxc1","baud":115200,"modbus_id":1,"short_id":"Tesla-0.0.7(2)","device_serial":"0x000004714B001C4B","neurio_connected":true,"disable_echo":true,"https_conf":{}},"Cached_readings":{"last_communication_time":"2019-09-28T01:18:08.589649117-07:00","instant_power":15.785774230957031,"instant_reactive_power":-252.12418460845947,"instant_apparent_power":252.61788363564307,"frequency":49.99971389770508,"energy_exported":8343253.28995022,"energy_imported":3918908.6732835528,"instant_average_voltage":229.02874755859375,"instant_total_current":0,"i_a_current":0,"i_b_current":0,"i_c_current":0,"v_l1n":231.59939575195312,"v_l2n":229.5283660888672,"v_l3n":226.0482177734375,"real_power_a":205.61331176757812,"real_power_b":-42.59746551513672,"real_power_c":-147.23007202148438,"reactive_power_a":-139.41871643066406,"reactive_power_b":-119.14984130859375,"reactive_power_c":8.341647148132324,"serial_number":"0x000004714B001C4B","version":"Tesla-0.0.7(2)","timeout":1500000000}}]';
-#     }
-# 
-#     elsif ( $path eq 'gridstatus' ) {
-#         $data = '{"grid_status":"SystemGridConnected"}';
-#     }
-#     elsif ( $path eq 'sitename' ) {
-#         $data = '{"site_name":"Meine Powerwall2AC","timezone":"Europe/Berlin"}';
-#     }
 
     ### Begin Error Handling
 
@@ -551,30 +502,6 @@ sub ErrorHandling($$$) {
         return;
     }
 
-#     if (  $data =~ /Error/i
-#       and exists($param->{code})
-#       and $param->{code} != 200 )
-#     {
-#         print( 'TESLA DEBUG0 - Path: ' . $param->{setCmd} . "\n" );
-#         print( 'TESLA DEBUG0 - ResponseString: ' . Dumper $data . "\n" );
-#         readingsBeginUpdate($hash);
-# 
-#         readingsBulkUpdate( $hash, 'state',            $param->{code}, 1 );
-#         readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
-# 
-#         readingsEndUpdate( $hash, 1 );
-# 
-#         Log3 $name, 3,
-#           "TeslaPowerwall2AC ($name) - statusRequestERROR: http error "
-#           . $param->{code};
-#         Log3 $name, 3,
-#           "TeslaPowerwall2AC ($name) - statusRequestERROR: data "
-#           . $data;
-# 
-#         $hash->{actionQueue} = [];
-#         return;
-#     }
-
     if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$# ) {
 
         readingsBeginUpdate($hash);
@@ -596,18 +523,7 @@ sub ErrorHandling($$$) {
         readingsEndUpdate( $hash, 1 );        
     }
     #### End Error Handling
-    
-    
-    
-    print( 'TESLA DEBUG1 - Path: ' . $param->{setCmd} . "\n" );
-    print( 'TESLA DEBUG1 - ResponseString: ' . Dumper $data . "\n" );
-    print( 'TESLA DEBUG1 - Error: ' . $err . "\n" )
-      if (  defined($err) and $err);
-    print( 'TESLA DEBUG1 - Code: ' . $param->{code} . "\n" )
-      if ( exists($param->{code}) );
-      
-      
-    
+
     Write($hash)
       if ( defined( $hash->{actionQueue} )
         and scalar( @{ $hash->{actionQueue} } ) > 0 );
@@ -648,9 +564,6 @@ sub ResponseProcessing($$$) {
     elsif ( $path eq 'powerwalls' ) {
         $readings = ReadingsProcessing_Powerwalls( $hash, $decode_json );
     }
-#     elsif ( $path eq 'siteinfo' ) {
-#         $readings = ReadingsProcessing_Site_Info( $hash, $decode_json );
-#     }
     elsif ( $path eq 'login' ) {
         return $hash->{TOKEN} = $decode_json->{token};
     }
@@ -780,35 +693,25 @@ sub ReadingsProcessing_Meters_Site($$) {
     my $name = $hash->{NAME};
     my %readings;
 
-    #     print('Ausgabe1: ' . Dumper $decode_json . "\n");
-
     if ( ref($decode_json) eq 'ARRAY'
         and scalar( @{$decode_json} ) > 0 )
     {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
-
-                #                 print('Ausgabe2: ' . Dumper $obj . "\n");
                 if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
                     or ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
                 {
                     if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
-
-             #                         print('Ausgabe3: ' . Dumper $obj . "\n");
                         while ( my ( $r, $v ) =
                             each %{ $decode_json->[0]->{$obj} } )
                         {
                             if ( ref($v) ne 'HASH' ) {
-
-#                                 print('Ausgabe4: ' . $obj . '-' . $r . ' = ' . $v . "\n");
                                 $readings{ $obj . '-' . $r } = $v;
                             }
                             else {
-#                                 print('Ausgabe5: ' . Dumper $decode_json->[0]->{$obj}->{$r} . "\n");
                                 while ( my ( $r2, $v2 ) =
                                     each %{ $decode_json->[0]->{$obj}->{$r} } )
                                 {
-#                                     print('Ausgabe6: ' . $obj . '-' . $r2 . ' = ' . $v2 . "\n");
                                     $readings{ $obj . '-' . $r . '-' . $r2 } =
                                       $v2;
                                 }
@@ -820,14 +723,12 @@ sub ReadingsProcessing_Meters_Site($$) {
                     }
                 }
                 else {
-#                     print('Ausgabe7: ' . Dumper $decode_json->[0]->{$obj} . "\n");
                     $readings{$obj} = $decode_json->[0]->{$obj};
                 }
             }
         }
     }
     else {
-        #         print('Ausgabe8: ' . "\n");
         $readings{'error'} = 'metes site response is not a Array';
     }
 
@@ -844,28 +745,20 @@ sub ReadingsProcessing_Meters_Solar($$) {
     {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
-
-                #                 print('Ausgabe2: ' . Dumper $obj . "\n");
                 if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
                     or ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
                 {
                     if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
-
-             #                         print('Ausgabe3: ' . Dumper $obj . "\n");
                         while ( my ( $r, $v ) =
                             each %{ $decode_json->[0]->{$obj} } )
                         {
                             if ( ref($v) ne 'HASH' ) {
-
-#                                 print('Ausgabe4: ' . $obj . '-' . $r . ' = ' . $v . "\n");
                                 $readings{ $obj . '-' . $r } = $v;
                             }
                             else {
-#                                 print('Ausgabe5: ' . Dumper $decode_json->[0]->{$obj}->{$r} . "\n");
                                 while ( my ( $r2, $v2 ) =
                                     each %{ $decode_json->[0]->{$obj}->{$r} } )
                                 {
-#                                     print('Ausgabe6: ' . $obj . '-' . $r2 . ' = ' . $v2 . "\n");
                                     $readings{ $obj . '-' . $r . '-' . $r2 } =
                                       $v2;
                                 }
@@ -877,14 +770,12 @@ sub ReadingsProcessing_Meters_Solar($$) {
                     }
                 }
                 else {
-#                     print('Ausgabe7: ' . Dumper $decode_json->[0]->{$obj} . "\n");
                     $readings{$obj} = $decode_json->[0]->{$obj};
                 }
             }
         }
     }
     else {
-        #         print('Ausgabe8: ' . "\n");
         $readings{'error'} = 'metes solar response is not a Array';
     }
 
@@ -1008,7 +899,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.112",
+  "version": "v0.7.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
