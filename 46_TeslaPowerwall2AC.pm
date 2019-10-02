@@ -176,12 +176,12 @@ my %paths = (
     'siteinfo'       => 'site_info',
     'sitename'       => 'site_info/site_name',
     'sitemaster'     => 'sitemaster',
-#     'powerwallsstop' => 'sitemaster/stop',
-#     'powerwallsrun'  => 'sitemaster/run',
+    'powerwallsstop' => 'sitemaster/stop',
+    'powerwallsrun'  => 'sitemaster/run',
     'powerwalls'     => 'powerwalls',
     'registration'   => 'customer/registration',
     'status'         => 'status',
-#     'login'          => 'login/Basic',
+    'login'          => 'login/Basic',
     'gridstatus'     => 'system_status/grid_status',
 );
 
@@ -484,8 +484,9 @@ sub ErrorHandling($$$) {
     print( 'TESLA DEBUG1 - Path: ' . $param->{setCmd} . "\n" );
     print( 'TESLA DEBUG1 - ResponseString: ' . Dumper $data . "\n" );
     print( 'TESLA DEBUG1 - Error: ' . $err . "\n" )
-      unless (  defined($err)
-            and $err);
+      if (  defined($err) and $err);
+    print( 'TESLA DEBUG1 - Code: ' . $param->{code} . "\n" )
+      if ( exists( $param->{code} );
 
 #         my $path = $param->{setCmd};   # temporär
 
@@ -519,43 +520,43 @@ sub ErrorHandling($$$) {
 #         $data = '{"site_name":"Meine Powerwall2AC","timezone":"Europe/Berlin"}';
 #     }
 
-    ### Begin Error Handling
-
-    if ( defined($err) ) {
-        if ( $err ne '' ) {
-
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, 'state',            $err, 1 );
-            readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
-            readingsEndUpdate( $hash, 1 );
-
-            Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
-
-            $hash->{actionQueue} = [];
-            return;
-        }
-    }
-
-    if ( $data eq '' and exists( $param->{code} ) && $param->{code} ne 200 ) {
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate( $hash, 'state', $param->{code}, 1 );
-
-        readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
-
-        Log3 $name, 3,
-          "TeslaPowerwall2AC ($name) - RequestERROR: " . $param->{code};
-
-        readingsEndUpdate( $hash, 1 );
-
-        Log3 $name, 5,
-            "TeslaPowerwall2AC ($name) - RequestERROR: received http code "
-          . $param->{code}
-          . " without any data after requesting";
-
-        $hash->{actionQueue} = [];
-        return;
-    }
+#     ### Begin Error Handling
+# 
+#     if ( defined($err) ) {
+#         if ( $err ne '' ) {
+# 
+#             readingsBeginUpdate($hash);
+#             readingsBulkUpdate( $hash, 'state',            $err, 1 );
+#             readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
+#             readingsEndUpdate( $hash, 1 );
+# 
+#             Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
+# 
+#             $hash->{actionQueue} = [];
+#             return;
+#         }
+#     }
+# 
+#     if ( $data eq '' and exists( $param->{code} ) && $param->{code} ne 200 ) {
+# 
+#         readingsBeginUpdate($hash);
+#         readingsBulkUpdate( $hash, 'state', $param->{code}, 1 );
+# 
+#         readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
+# 
+#         Log3 $name, 3,
+#           "TeslaPowerwall2AC ($name) - RequestERROR: " . $param->{code};
+# 
+#         readingsEndUpdate( $hash, 1 );
+# 
+#         Log3 $name, 5,
+#             "TeslaPowerwall2AC ($name) - RequestERROR: received http code "
+#           . $param->{code}
+#           . " without any data after requesting";
+# 
+#         $hash->{actionQueue} = [];
+#         return;
+#     }
 
 #     if ( ( $data =~ /Error/i ) and exists( $param->{code} ) ) {
 # 
@@ -574,43 +575,43 @@ sub ErrorHandling($$$) {
 #         return;
 #     }
 
-    if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$# ) {
-
-        readingsBeginUpdate($hash);
-
-        readingsBulkUpdate( $hash, 'state', $1, 1 );
-        readingsBulkUpdate(
-            $hash,
-            'lastRequestError',
-            'Path: '
-              . $param->{setCmd} . ' '
-              . $1
-              . ' - Error: '
-              . $2
-              . ' Messages: '
-              . $3,
-            1
-        );
-
-        readingsEndUpdate( $hash, 1 );
-
-        #         $hash->{actionQueue} = [];
-        #         return;
-        ### End Error Handling
-    }
-
+#     if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$# ) {
+# 
+#         readingsBeginUpdate($hash);
+# 
+#         readingsBulkUpdate( $hash, 'state', $1, 1 );
+#         readingsBulkUpdate(
+#             $hash,
+#             'lastRequestError',
+#             'Path: '
+#               . $param->{setCmd} . ' '
+#               . $1
+#               . ' - Error: '
+#               . $2
+#               . ' Messages: '
+#               . $3,
+#             1
+#         );
+# 
+#         readingsEndUpdate( $hash, 1 );
+# 
+#         #         $hash->{actionQueue} = [];
+#         #         return;
+#         ### End Error Handling
+#     }
+# 
     Write($hash)
       if ( defined( $hash->{actionQueue} )
         and scalar( @{ $hash->{actionQueue} } ) > 0 );
-
-    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
-
-    print( 'TESLA DEBUG2 - ResponseString: ' . Dumper $data );
-    print( 'TESLA DEBUG2 - Error: ' . $err . "\n" )
-      unless (  defined($err)
-            and $err);
-
-    ResponseProcessing( $hash, $param->{setCmd}, $data );
+# 
+#     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
+# 
+#     print( 'TESLA DEBUG2 - ResponseString: ' . Dumper $data );
+#     print( 'TESLA DEBUG2 - Error: ' . $err . "\n" )
+#       unless (  defined($err)
+#             and $err);
+# 
+#     ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
 
 sub ResponseProcessing($$$) {
