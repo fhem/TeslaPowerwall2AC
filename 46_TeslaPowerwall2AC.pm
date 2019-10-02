@@ -648,9 +648,9 @@ sub ResponseProcessing($$$) {
     elsif ( $path eq 'powerwalls' ) {
         $readings = ReadingsProcessing_Powerwalls( $hash, $decode_json );
     }
-    elsif ( $path eq 'siteinfo' ) {
-        $readings = ReadingsProcessing_Site_Info( $hash, $decode_json );
-    }
+#     elsif ( $path eq 'siteinfo' ) {
+#         $readings = ReadingsProcessing_Site_Info( $hash, $decode_json );
+#     }
     elsif ( $path eq 'login' ) {
         return $hash->{TOKEN} = $decode_json->{token};
     }
