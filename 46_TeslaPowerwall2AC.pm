@@ -272,11 +272,11 @@ sub Attr(@) {
 
     if ( $attrName eq 'interval' ) {
         if ( $cmd eq 'set' ) {
-            if ( $attrVal < 30 ) {
+            if ( $attrVal < 60 ) {
                 Log3 $name, 3,
-"TeslaPowerwall2AC ($name) - interval too small, please use something >= 30 (sec), default is 300 (sec)";
+"TeslaPowerwall2AC ($name) - interval too small, please use something >= 60 (sec), default is 300 (sec)";
                 return
-'interval too small, please use something >= 30 (sec), default is 300 (sec)';
+'interval too small, please use something >= 60 (sec), default is 300 (sec)';
 
             }
             else {
@@ -524,7 +524,8 @@ sub ErrorHandling($$$) {
     }
     #### End Error Handling
 
-    Write($hash)
+    InternalTimer( gettimeofday() + 3,
+        'TeslaPowerwall2AC_Write', $hash );
       if ( defined( $hash->{actionQueue} )
         and scalar( @{ $hash->{actionQueue} } ) > 0 );
 
@@ -899,7 +900,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.7.1",
+  "version": "v0.7.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
