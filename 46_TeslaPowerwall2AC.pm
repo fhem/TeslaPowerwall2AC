@@ -165,6 +165,7 @@ GP_Export(
     qw(
       Initialize
       Timer_GetData
+      Write
       )
 );
 
