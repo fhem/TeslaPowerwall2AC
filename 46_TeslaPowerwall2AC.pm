@@ -176,8 +176,8 @@ my %paths = (
     'siteinfo'       => 'site_info',
     'sitename'       => 'site_info/site_name',
     'sitemaster'     => 'sitemaster',
-    'powerwallsstop' => 'sitemaster/stop',
-    'powerwallsrun'  => 'sitemaster/run',
+#     'powerwallsstop' => 'sitemaster/stop',
+#     'powerwallsrun'  => 'sitemaster/run',
     'powerwalls'     => 'powerwalls',
     'registration'   => 'customer/registration',
     'status'         => 'status',
@@ -551,29 +551,29 @@ sub ErrorHandling($$$) {
         return;
     }
 
-    if (  $data =~ /Error/i
-      and exists($param->{code})
-      and $param->{code} != 200 )
-    {
-        print( 'TESLA DEBUG0 - Path: ' . $param->{setCmd} . "\n" );
-        print( 'TESLA DEBUG0 - ResponseString: ' . Dumper $data . "\n" );
-        readingsBeginUpdate($hash);
-
-        readingsBulkUpdate( $hash, 'state',            $param->{code}, 1 );
-        readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
-
-        readingsEndUpdate( $hash, 1 );
-
-        Log3 $name, 3,
-          "TeslaPowerwall2AC ($name) - statusRequestERROR: http error "
-          . $param->{code};
-        Log3 $name, 3,
-          "TeslaPowerwall2AC ($name) - statusRequestERROR: data "
-          . $data;
-
-        $hash->{actionQueue} = [];
-        return;
-    }
+#     if (  $data =~ /Error/i
+#       and exists($param->{code})
+#       and $param->{code} != 200 )
+#     {
+#         print( 'TESLA DEBUG0 - Path: ' . $param->{setCmd} . "\n" );
+#         print( 'TESLA DEBUG0 - ResponseString: ' . Dumper $data . "\n" );
+#         readingsBeginUpdate($hash);
+# 
+#         readingsBulkUpdate( $hash, 'state',            $param->{code}, 1 );
+#         readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
+# 
+#         readingsEndUpdate( $hash, 1 );
+# 
+#         Log3 $name, 3,
+#           "TeslaPowerwall2AC ($name) - statusRequestERROR: http error "
+#           . $param->{code};
+#         Log3 $name, 3,
+#           "TeslaPowerwall2AC ($name) - statusRequestERROR: data "
+#           . $data;
+# 
+#         $hash->{actionQueue} = [];
+#         return;
+#     }
 
     if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$# ) {
 
