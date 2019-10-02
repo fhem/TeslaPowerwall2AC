@@ -555,7 +555,8 @@ sub ErrorHandling($$$) {
       and exists($param->{code})
       and $param->{code} != 200 )
     {
-
+        print( 'TESLA DEBUG0 - Path: ' . $param->{setCmd} . "\n" );
+        print( 'TESLA DEBUG0 - ResponseString: ' . Dumper $data . "\n" );
         readingsBeginUpdate($hash);
 
         readingsBulkUpdate( $hash, 'state',            $param->{code}, 1 );
@@ -566,6 +567,9 @@ sub ErrorHandling($$$) {
         Log3 $name, 3,
           "TeslaPowerwall2AC ($name) - statusRequestERROR: http error "
           . $param->{code};
+        Log3 $name, 3,
+          "TeslaPowerwall2AC ($name) - statusRequestERROR: data "
+          . $data;
 
         $hash->{actionQueue} = [];
         return;
