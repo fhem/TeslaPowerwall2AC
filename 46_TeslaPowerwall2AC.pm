@@ -177,14 +177,16 @@ my %paths = (
     'siteinfo'    => 'site_info',
     'sitename'    => 'site_info/site_name',
     'sitemaster'  => 'sitemaster',
-
-    #     'powerwallsstop' => 'sitemaster/stop',
-    #     'powerwallsrun'  => 'sitemaster/run',
     'powerwalls'   => 'powerwalls',
     'registration' => 'customer/registration',
     'status'       => 'status',
     'login'        => 'login/Basic',
     'gridstatus'   => 'system_status/grid_status',
+);
+
+my %cmdPaths = (
+    'powerwallsstop' => 'sitemaster/stop',
+    'powerwallsrun'  => 'sitemaster/run',
 );
 
 sub Initialize($) {
@@ -236,6 +238,7 @@ sub Undef($$) {
     my ( $hash, $arg ) = @_;
     my $name = $hash->{NAME};
 
+    RemoveInternalTimer($hash);
     Log3 $name, 3, "TeslaPowerwall2AC ($name) - Device $name deleted";
 
     return undef;
@@ -383,9 +386,7 @@ sub Set($@) {
     my $arg;
 
     if ( $cmd eq 'powerwalls' ) {
-
         $arg = lc( $cmd . $args[0] );
-
     }
     else {
 
@@ -405,6 +406,9 @@ sub Set($@) {
 sub Timer_GetData($) {
     my $hash = shift;
     my $name = $hash->{NAME};
+
+
+    RemoveInternalTimer($hash);
 
     if ( defined( $hash->{actionQueue} )
         and scalar( @{ $hash->{actionQueue} } ) == 0 )
@@ -792,7 +796,14 @@ sub CreateUri($$) {
     my $header;
     my $data;
 
-    $uri = $host . '/api/' . $paths{$path};
+    if ( $path eq 'powerwallsstop'
+      or $path eq 'powerwallsruns' )
+    {
+        $uri = $host . '/api/' . $cmdPaths{$path};
+    }
+    else {
+        $uri = $host . '/api/' . $paths{$path};
+    }
 
     if ( $path eq 'sitemasterrun' ) {
         $header = 'Authorization: Bearer' . $hash->{TOKEN};
@@ -901,7 +912,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.7.2",
+  "version": "v0.7.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
