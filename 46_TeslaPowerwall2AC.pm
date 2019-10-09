@@ -170,13 +170,13 @@ GP_Export(
 );
 
 my %paths = (
-    'statussoe'   => 'system_status/soe',
-    'aggregates'  => 'meters/aggregates',
-    'meterssite'  => 'meters/site',
-    'meterssolar' => 'meters/solar',
-    'siteinfo'    => 'site_info',
-    'sitename'    => 'site_info/site_name',
-    'sitemaster'  => 'sitemaster',
+    'statussoe'    => 'system_status/soe',
+    'aggregates'   => 'meters/aggregates',
+    'meterssite'   => 'meters/site',
+    'meterssolar'  => 'meters/solar',
+    'siteinfo'     => 'site_info',
+    'sitename'     => 'site_info/site_name',
+    'sitemaster'   => 'sitemaster',
     'powerwalls'   => 'powerwalls',
     'registration' => 'customer/registration',
     'status'       => 'status',
@@ -406,7 +406,6 @@ sub Set($@) {
 sub Timer_GetData($) {
     my $hash = shift;
     my $name = $hash->{NAME};
-
 
     RemoveInternalTimer($hash);
 
@@ -796,8 +795,8 @@ sub CreateUri($$) {
     my $header;
     my $data;
 
-    if ( $path eq 'powerwallsstop'
-      or $path eq 'powerwallsruns' )
+    if (   $path eq 'powerwallsstop'
+        or $path eq 'powerwallsruns' )
     {
         $uri = $host . '/api/' . $cmdPaths{$path};
     }
