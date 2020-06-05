@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2017-2019 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2020 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -911,7 +911,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.7.3",
+  "version": "v0.8.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
