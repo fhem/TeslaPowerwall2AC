@@ -723,7 +723,8 @@ sub ReadingsProcessing_Powerwalls {
             if ( ref($powerwall) eq 'HASH' ) {
 
                 while ( my ( $r, $v ) = each %{$powerwall} ) {
-                    $readings{ 'wall_' . $i . '_' . $r } = $v;
+                    $readings{ 'wall_' . $i . '_' . $r } = $v
+                      if ( ref($v) ne 'HASH' );
 
                     if ( ref($v) eq 'HASH' ) {
                         while ( my ( $s, $t ) = each %{$v} ) {
@@ -1087,7 +1088,7 @@ sub Rename {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.0.0",
+  "version": "v1.0.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
