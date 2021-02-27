@@ -144,6 +144,9 @@ BEGIN {
           readingsBulkUpdateIfChanged
           readingsBeginUpdate
           readingsEndUpdate
+          setKeyValue
+          getKeyValue
+          getUniqueId
           CommandAttr
           defs
           Log3
@@ -193,34 +196,38 @@ sub Initialize {
     my $hash = shift;
 
     # Consumer
-    $hash->{GetFn}    = 'FHEM::TeslaPowerwall2AC::Get';
-    $hash->{SetFn}    = 'FHEM::TeslaPowerwall2AC::Set';
-    $hash->{DefFn}    = 'FHEM::TeslaPowerwall2AC::Define';
-    $hash->{UndefFn}  = 'FHEM::TeslaPowerwall2AC::Undef';
-    $hash->{NotifyFn} = 'FHEM::TeslaPowerwall2AC::Notify';
+    $hash->{GetFn}    = \&Get;
+    $hash->{SetFn}    = \&Set;
+    $hash->{DefFn}    = \&Define;
+    $hash->{UndefFn}  = \&Undef;
+    $hash->{NotifyFn} = \&Notify;
+    $hash->{RenameFn} = \&Rename;
 
-    $hash->{AttrFn} = 'FHEM::TeslaPowerwall2AC::Attr';
+    $hash->{AttrFn} = \&Attr;
     $hash->{AttrList} =
-      'interval ' . 'disable:1 ' . 'devel:1 ' . $readingFnAttributes;
+              'interval '
+            . 'disable:1 '
+            . 'devel:1 '
+            . 'emailaddr '
+            . $readingFnAttributes;
+    $hash->{parseParams} = 1;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub Define {
-    my $hash    = shift;
-    my $def     = shift;
-    
-    my @a       = split( '[ \t][ \t]*', $def );
+    my $hash = shift // return;
+    my $aArg = shift // return;    
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return 'too few parameters: define <name> TeslaPowerwall2AC <HOST>'
-      if ( @a != 3 );
+      if ( scalar( @{$aArg} ) != 3 );
 
-    my $name = $a[0];
+    my $name = $aArg->[0];
+    my $host = $aArg->[2];
 
-    my $host = $a[2];
     $hash->{HOST}        = $host;
     $hash->{INTERVAL}    = 300;
     $hash->{VERSION}     = version->parse($VERSION)->normal;
@@ -237,9 +244,7 @@ sub Define {
 
 sub Undef {
     my $hash    = shift;
-    my $arg     = shift;
-    
-    my $name    = $hash->{NAME};
+    my $name    = shift;
 
     RemoveInternalTimer($hash);
     Log3 $name, 3, "TeslaPowerwall2AC ($name) - Device $name deleted";
@@ -292,7 +297,6 @@ sub Attr {
                 $hash->{INTERVAL} = $attrVal;
                 Log3 $name, 3,
                   "TeslaPowerwall2AC ($name) - set interval to $attrVal";
-                Timer_GetData($hash);
             }
         }
         elsif ( $cmd eq 'del' ) {
@@ -300,7 +304,6 @@ sub Attr {
             $hash->{INTERVAL} = 300;
             Log3 $name, 3,
               "TeslaPowerwall2AC ($name) - set interval to default";
-            Timer_GetData($hash);
         }
     }
 
@@ -321,18 +324,24 @@ sub Notify {
 
     Timer_GetData($hash)
       if (
-        grep /^INITIALIZED$/,
-        @{$events} or grep /^DELETEATTR.$name.disable$/,
-        @{$events} or grep /^DELETEATTR.$name.interval$/,
-        @{$events} or ( grep /^DEFINED.$name$/, @{$events} and $init_done )
+           ( grep /^INITIALIZED$/, @{$events}
+          or grep /^ATTR.$name.emailaddr$/, @{$events}
+          or grep /^ATTR.$name.interval$/, @{$events}
+          or grep /^ATTR.$name.disable$/, @{$events}
+          or grep /^DELETEATTR.$name.disable$/, @{$events}
+          or grep /^DELETEATTR.$name.interval$/, @{$events}
+          or grep /^DEFINED.$name$/, @{$events} )
+        and $init_done
       );
     return;
 }
 
 sub Get {
-    my $hash    = shift;
-    my $name    = shift;
-    my $cmd     = shift;
+    my $hash = shift // return;
+    my $aArg = shift // return;
+
+    my $name = shift @$aArg;
+    my $cmd  = shift @$aArg // return qq{"get $name" needs at least one argument};
     my $arg;
 
     if ( $cmd eq 'statusSOE' ) {
@@ -372,8 +381,11 @@ sub Get {
     }
     else {
 
-        my $list =
-'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg';
+        my $list = '';
+        $list .=
+'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg'
+  if(  AttrVal($name,'emailaddr','none') ne 'none'
+    && defined(ReadPassword($hash, $name)) );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
     }
@@ -389,15 +401,33 @@ sub Get {
 }
 
 sub Set {
-    my ( $hash, $name, $cmd, @args ) = @_;
+    my $hash = shift // return;
+    my $aArg = shift // return;
+
+    my $name = shift @$aArg;
+    my $cmd  = shift @$aArg // return qq{"set $name" needs at least one argument};
     my $arg;
 
     if ( $cmd eq 'powerwalls' ) {
-        $arg = lc( $cmd . $args[0] );
+        $arg = lc( $cmd . $aArg->[0] );
+    }
+    elsif ( lc $cmd eq 'setpassword' ) {
+        return "please set Attribut emailaddr first"
+          if ( AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
+        return "usage: $cmd <password>" if ( scalar( @{$aArg} ) != 1 );
+
+        StorePassword( $hash, $name, $aArg->[0] );
+        return Timer_GetData($hash);
+    }
+    elsif ( lc $cmd eq 'removepassword' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+
+        DeletePassword($hash);
+        return Timer_GetData($hash);
     }
     else {
 
-        my $list = '';
+        my $list = ( defined(ReadPassword($hash, $name)) ? 'removePassword:noArg ' : 'setPassword ');
         $list .= 'powerwalls:run,stop'
           if ( AttrVal( $name, 'devel', 0 ) == 1 );
 
@@ -419,7 +449,14 @@ sub Timer_GetData {
     if ( defined( $hash->{actionQueue} )
         and scalar( @{ $hash->{actionQueue} } ) == 0 )
     {
-        if ( not IsDisabled($name) ) {
+        if ( !IsDisabled($name) ) {
+            return readingsSingleUpdate( $hash, 'state',
+              'please set Attribut emailaddr first', 1 )
+                if ( AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
+            return readingsSingleUpdate( $hash, 'state',
+              'please set password first', 1 )
+                if ( !defined( ReadPassword( $hash, $name ) ) );
+        
             if ( !defined( $hash->{TOKEN}) ) {
                 unshift( @{ $hash->{actionQueue} }, 'login' );
             }
@@ -432,7 +469,7 @@ sub Timer_GetData {
             Write($hash);
         }
         else {
-            readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
+            return readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
         }
     }
 
@@ -824,10 +861,11 @@ sub CreateUri {
     my $hash        = shift;
     my $path        = shift;
 
+    my $name        = $hash->{NAME};
     my $host        = $hash->{HOST};
     my $header      = ( defined($hash->{TOKEN}) ? 'Cookie: AuthCookie=' . $hash->{TOKEN} : undef );
     my $method      = 'GET';
-    my $uri         = ( defined($paths{$path}) ? $host . '/api/' . $paths{$path} : undef );
+    my $uri         = ( $path ne 'login' ? $host . '/api/' . $paths{$path} : undef );
     my $data;
 
 
@@ -835,10 +873,10 @@ sub CreateUri {
         $method     = 'POST';
         $header     = 'Content-Type: application/json';
         $uri        = 'login/Basic',
-        $data       = '{"username":"","password":"S'
-                . ReadingsVal( $hash->{NAME},
-                'powerwalls-wall_0_PackageSerialNumber', 0 )
-                . '","force_sm_off":false}';
+        $data       = '{"username":"customer","password":"' . ReadPassword( $hash, $name ) . '","email":"' . AttrVal($name,'emailaddr','test@test.de') . '","force_sm_off":false}'
+                
+                
+                
     }
     elsif ( $path eq 'powerwallsstop'
          || $path eq 'powerwallsruns' )
@@ -847,6 +885,104 @@ sub CreateUri {
     }
 
     return ( $uri, $method, $header, $data, $path );
+}
+
+sub StorePassword {
+    my $hash     = shift;
+    my $name     = shift;
+    my $password = shift;
+
+    my $index   = $hash->{TYPE} . "_" . $name . "_passwd";
+    my $key     = getUniqueId() . $index;
+    my $enc_pwd = "";
+
+    if ( eval "use Digest::MD5;1" ) {
+
+        $key = Digest::MD5::md5_hex( unpack "H*", $key );
+        $key .= Digest::MD5::md5_hex($key);
+    }
+
+    for my $char ( split //, $password ) {
+
+        my $encode = chop($key);
+        $enc_pwd .= sprintf( "%.2x", ord($char) ^ ord($encode) );
+        $key = $encode . $key;
+    }
+
+    my $err = setKeyValue( $index, $enc_pwd );
+    return "error while saving the password - $err" if ( defined($err) );
+
+    return "password successfully saved";
+}
+
+sub ReadPassword {
+    my $hash = shift;
+    my $name = shift;
+
+    my $index = $hash->{TYPE} . "_" . $name . "_passwd";
+    my $key   = getUniqueId() . $index;
+    my ( $password, $err );
+
+    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Read password from file";
+
+    ( $err, $password ) = getKeyValue($index);
+
+    if ( defined($err) ) {
+
+        Log3 $name, 3,
+"TeslaPowerwall2AC ($name) - unable to read password from file: $err";
+        return undef;
+
+    }
+
+    if ( defined($password) ) {
+        if ( eval "use Digest::MD5;1" ) {
+
+            $key = Digest::MD5::md5_hex( unpack "H*", $key );
+            $key .= Digest::MD5::md5_hex($key);
+        }
+
+        my $dec_pwd = '';
+
+        for my $char ( map { pack( 'C', hex($_) ) } ( $password =~ /(..)/g ) ) {
+
+            my $decode = chop($key);
+            $dec_pwd .= chr( ord($char) ^ ord($decode) );
+            $key = $decode . $key;
+        }
+
+        return $dec_pwd;
+
+    }
+    else {
+
+        Log3 $name, 3, "TeslaPowerwall2AC ($name) - No password in file";
+        return undef;
+    }
+
+    return;
+}
+
+
+
+sub DeletePassword {
+    my $hash    = shift;
+
+    setKeyValue( $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd", undef );
+
+    return;
+}
+
+sub Rename {
+    my $new     = shift;
+    my $old     = shift;
+
+    my $hash    = $defs{$new};
+
+    StorePassword( $hash, $new, ReadPassword( $hash, $old ) );
+    setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
+
+    return;
 }
 
 1;
@@ -894,6 +1030,8 @@ sub CreateUri {
         <li>state           - information about internel modul processes</li>
         <li>status-*        - readings of the /api/status response</li>
         <li>statussoe-*     - readings of the /api/system_status/soe response</li>
+        <li>setPassword     - write password encrypted to password file</li>
+        <li>removePassword  - remove password from password file</li>
     </ul>
     <a name="TeslaPowerwall2ACget"></a>
     <b>get</b>
@@ -910,6 +1048,7 @@ sub CreateUri {
     <b>Attribute</b>
     <ul>
         <li>interval - interval in seconds for automatically fetch data (default 300)</li>
+        <li>emailaddr - emailadress to get cookie token</li>
     </ul>
 </ul>
 
