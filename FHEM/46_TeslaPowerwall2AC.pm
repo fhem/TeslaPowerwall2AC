@@ -385,7 +385,8 @@ sub Get {
         $list .=
 'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg'
   if(  AttrVal($name,'emailaddr','none') ne 'none'
-    && defined(ReadPassword($hash, $name)) );
+    && defined(ReadPassword($hash, $name))
+    && defined($hash->{TOKEN}) );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
     }
@@ -865,18 +866,19 @@ sub CreateUri {
     my $host        = $hash->{HOST};
     my $header      = ( defined($hash->{TOKEN}) ? 'Cookie: AuthCookie=' . $hash->{TOKEN} : undef );
     my $method      = 'GET';
-    my $uri         = ( $path ne 'login' ? $host . '/api/' . $paths{$path} : undef );
+    my $uri         = ( $path ne 'login' ? $host . '/api/' . $paths{$path} : $host . '/api/login/Basic' );
     my $data;
 
 
     if ( $path eq 'login' ) {
         $method     = 'POST';
         $header     = 'Content-Type: application/json';
-        $uri        = 'login/Basic',
-        $data       = '{"username":"customer","password":"' . ReadPassword( $hash, $name ) . '","email":"' . AttrVal($name,'emailaddr','test@test.de') . '","force_sm_off":false}'
-                
-                
-                
+        $data       = 
+              '{"username":"customer","password":"'
+            . ReadPassword( $hash, $name )
+            . '","email":"'
+            . AttrVal($name,'emailaddr','test@test.de')
+            . '","force_sm_off":false}'
     }
     elsif ( $path eq 'powerwallsstop'
          || $path eq 'powerwallsruns' )
