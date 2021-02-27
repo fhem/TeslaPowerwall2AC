@@ -719,7 +719,7 @@ sub ReadingsProcessing_Powerwalls {
         and scalar( @{ $decode_json->{powerwalls} } ) > 0 )
     {
         my $i = 0;
-        foreach my $powerwall ( @{ $decode_json->{powerwalls} } ) {
+        for my $powerwall ( @{ $decode_json->{powerwalls} } ) {
             if ( ref($powerwall) eq 'HASH' ) {
 
                 while ( my ( $r, $v ) = each %{$powerwall} ) {
