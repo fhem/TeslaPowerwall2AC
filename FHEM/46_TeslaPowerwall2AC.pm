@@ -725,7 +725,7 @@ sub ReadingsProcessing_Powerwalls {
                 while ( my ( $r, $v ) = each %{$powerwall} ) {
                     $readings{ 'wall_' . $i . '_' . $r } = $v;
 
-                    if ref($v) eq 'HASH' ) {
+                    if ( ref($v) eq 'HASH' ) {
                         while ( my ( $s, $t ) = each %{$v} ) {
                             $readings{ 'wall_' . $i . '_' . $r . '_' . $s } = $t;
                         }
