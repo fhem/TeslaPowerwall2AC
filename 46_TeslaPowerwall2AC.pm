@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2017-2019 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -170,28 +170,27 @@ GP_Export(
 );
 
 my %paths = (
-    'statussoe'    => 'system_status/soe',
-    'aggregates'   => 'meters/aggregates',
-    'meterssite'   => 'meters/site',
-    'meterssolar'  => 'meters/solar',
-    'siteinfo'     => 'site_info',
-    'sitename'     => 'site_info/site_name',
-    'sitemaster'   => 'sitemaster',
-    'powerwalls'   => 'powerwalls',
-    'registration' => 'customer/registration',
-    'status'       => 'status',
-    'login'        => 'login/Basic',
-    'gridstatus'   => 'system_status/grid_status',
+    'statussoe'         => 'system_status/soe',
+    'aggregates'        => 'meters/aggregates',
+    'meterssite'        => 'meters/site',
+    'meterssolar'       => 'meters/solar',
+    'siteinfo'          => 'site_info',
+    'sitename'          => 'site_info/site_name',
+    'sitemaster'        => 'sitemaster',
+    'powerwalls'        => 'powerwalls',
+    'registration'      => 'customer/registration',
+    'status'            => 'status',
+    'gridstatus'        => 'system_status/grid_status',
 );
 
 my %cmdPaths = (
-    'powerwallsstop' => 'sitemaster/stop',
-    'powerwallsrun'  => 'sitemaster/run',
+    'powerwallsstop'    => 'sitemaster/stop',
+    'powerwallsrun'     => 'sitemaster/run',
 );
 
-sub Initialize($) {
+sub Initialize {
 
-    my ($hash) = @_;
+    my $hash = shift;
 
     # Consumer
     $hash->{GetFn}    = 'FHEM::TeslaPowerwall2AC::Get';
@@ -207,9 +206,11 @@ sub Initialize($) {
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-sub Define($$) {
-    my ( $hash, $def ) = @_;
-    my @a = split( '[ \t][ \t]*', $def );
+sub Define {
+    my $hash    = shift;
+    my $def     = shift;
+    
+    my @a       = split( '[ \t][ \t]*', $def );
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
@@ -234,9 +235,11 @@ sub Define($$) {
     return undef;
 }
 
-sub Undef($$) {
-    my ( $hash, $arg ) = @_;
-    my $name = $hash->{NAME};
+sub Undef {
+    my $hash    = shift;
+    my $arg     = shift;
+    
+    my $name    = $hash->{NAME};
 
     RemoveInternalTimer($hash);
     Log3 $name, 3, "TeslaPowerwall2AC ($name) - Device $name deleted";
@@ -244,7 +247,7 @@ sub Undef($$) {
     return undef;
 }
 
-sub Attr(@) {
+sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
 
@@ -304,9 +307,11 @@ sub Attr(@) {
     return undef;
 }
 
-sub Notify($$) {
-    my ( $hash, $dev ) = @_;
-    my $name = $hash->{NAME};
+sub Notify {
+    my $hash    = shift;
+    my $dev     = shift;
+    
+    my $name    = $hash->{NAME};
     return if ( IsDisabled($name) );
 
     my $devname = $dev->{NAME};
@@ -324,8 +329,10 @@ sub Notify($$) {
     return;
 }
 
-sub Get($@) {
-    my ( $hash, $name, $cmd ) = @_;
+sub Get {
+    my $hash    = shift;
+    my $name    = shift;
+    my $cmd     = shift;
     my $arg;
 
     if ( $cmd eq 'statusSOE' ) {
@@ -381,7 +388,7 @@ sub Get($@) {
     return undef;
 }
 
-sub Set($@) {
+sub Set {
     my ( $hash, $name, $cmd, @args ) = @_;
     my $arg;
 
@@ -403,7 +410,7 @@ sub Set($@) {
     return undef;
 }
 
-sub Timer_GetData($) {
+sub Timer_GetData {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -413,12 +420,16 @@ sub Timer_GetData($) {
         and scalar( @{ $hash->{actionQueue} } ) == 0 )
     {
         if ( not IsDisabled($name) ) {
-            while ( my $obj = each %paths ) {
-                unshift( @{ $hash->{actionQueue} }, $obj );
+            if ( !defined( $hash->{TOKEN}) ) {
+                unshift( @{ $hash->{actionQueue} }, 'login' );
+            }
+            else {
+                while ( my $obj = each %paths ) {
+                    unshift( @{ $hash->{actionQueue} }, $obj );
+                }
             }
 
             Write($hash);
-
         }
         else {
             readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
@@ -431,8 +442,8 @@ sub Timer_GetData($) {
       "TeslaPowerwall2AC ($name) - Call InternalTimer Timer_GetData";
 }
 
-sub Write($) {
-    my ($hash) = @_;
+sub Write {
+    my $hash = shift;
     my $name = $hash->{NAME};
 
     my ( $uri, $method, $header, $data, $path ) =
@@ -464,10 +475,13 @@ sub Write($) {
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Send with URI: https://$uri";
 }
 
-sub ErrorHandling($$$) {
-    my ( $param, $err, $data ) = @_;
-    my $hash = $param->{hash};
-    my $name = $hash->{NAME};
+sub ErrorHandling {
+    my $param   = shift;
+    my $err     = shift;
+    my $data    = shift;
+    
+    my $hash    = $param->{hash};
+    my $name    = $hash->{NAME};
 
     ### Begin Error Handling
 
@@ -538,9 +552,12 @@ sub ErrorHandling($$$) {
     ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
 
-sub ResponseProcessing($$$) {
-    my ( $hash, $path, $json ) = @_;
-    my $name = $hash->{NAME};
+sub ResponseProcessing {
+    my $hash    = shift;
+    my $path    = shift;
+    my $json    = shift;
+
+    my $name    = $hash->{NAME};
     my $decode_json;
     my $readings;
 
@@ -570,7 +587,8 @@ sub ResponseProcessing($$$) {
         $readings = ReadingsProcessing_Powerwalls( $hash, $decode_json );
     }
     elsif ( $path eq 'login' ) {
-        return $hash->{TOKEN} = $decode_json->{token};
+        $hash->{TOKEN} = $decode_json->{token};
+        return Timer_GetData($hash);
     }
     elsif ( $path eq 'meterssite' ) {
         $readings = ReadingsProcessing_Meters_Site( $hash, $decode_json );
@@ -585,9 +603,12 @@ sub ResponseProcessing($$$) {
     WriteReadings( $hash, $path, $readings );
 }
 
-sub WriteReadings($$$) {
-    my ( $hash, $path, $readings ) = @_;
-    my $name = $hash->{NAME};
+sub WriteReadings {
+    my $hash        = shift;
+    my $path        = shift;
+    my $readings    = shift;
+
+    my $name        = $hash->{NAME};
 
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Write Readings";
 
@@ -610,6 +631,7 @@ sub WriteReadings($$$) {
             ) * ReadingsVal( $name, 'statussoe-percentage', 0 )
         )
     );
+
     readingsBulkUpdateIfChanged( $hash, 'actionQueue',
         scalar( @{ $hash->{actionQueue} } ) . ' entries in the Queue' );
     readingsBulkUpdateIfChanged(
@@ -623,12 +645,15 @@ sub WriteReadings($$$) {
               . ' paths in actionQueue'
         )
     );
+
     readingsEndUpdate( $hash, 1 );
 }
 
-sub ReadingsProcessing_Aggregates($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Aggregates {
+    my $hash        = shift;
+    my $decode_json = shift;
+    
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
@@ -645,9 +670,11 @@ sub ReadingsProcessing_Aggregates($$) {
     return \%readings;
 }
 
-sub ReadingsProcessing_Powerwalls($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Powerwalls {
+    my $hash        = shift;
+    my $decode_json = shift;
+    
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref( $decode_json->{powerwalls} ) eq 'ARRAY'
@@ -674,9 +701,11 @@ sub ReadingsProcessing_Powerwalls($$) {
     return \%readings;
 }
 
-sub ReadingsProcessing_Site_Info($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Site_Info {
+    my $hash        = shift;
+    my $decode_json = shift;
+
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
@@ -693,9 +722,11 @@ sub ReadingsProcessing_Site_Info($$) {
     return \%readings;
 }
 
-sub ReadingsProcessing_Meters_Site($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Meters_Site {
+    my $hash        = shift;
+    my $decode_json = shift;
+    
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'ARRAY'
@@ -704,7 +735,7 @@ sub ReadingsProcessing_Meters_Site($$) {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
                 if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
-                    or ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
+                    || ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
                 {
                     if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
                         while ( my ( $r, $v ) =
@@ -740,9 +771,11 @@ sub ReadingsProcessing_Meters_Site($$) {
     return \%readings;
 }
 
-sub ReadingsProcessing_Meters_Solar($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Meters_Solar {
+    my $hash        = shift;
+    my $decode_json = shift;
+
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'ARRAY'
@@ -751,7 +784,7 @@ sub ReadingsProcessing_Meters_Solar($$) {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
                 if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
-                    or ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
+                    || ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
                 {
                     if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
                         while ( my ( $r, $v ) =
@@ -787,34 +820,30 @@ sub ReadingsProcessing_Meters_Solar($$) {
     return \%readings;
 }
 
-sub CreateUri($$) {
-    my ( $hash, $path ) = @_;
-    my $host   = $hash->{HOST};
-    my $method = 'GET';
-    my $uri;
-    my $header;
+sub CreateUri {
+    my $hash        = shift;
+    my $path        = shift;
+
+    my $host        = $hash->{HOST};
+    my $header      = ( defined($hash->{TOKEN}) ? 'Cookie: AuthCookie=' . $hash->{TOKEN} : undef );
+    my $method      = 'GET';
+    my $uri         = ( defined($paths{$path}) ? $host . '/api/' . $paths{$path} : undef );
     my $data;
 
-    if (   $path eq 'powerwallsstop'
-        or $path eq 'powerwallsruns' )
+
+    if ( $path eq 'login' ) {
+        $method     = 'POST';
+        $header     = 'Content-Type: application/json';
+        $uri        = 'login/Basic',
+        $data       = '{"username":"","password":"S'
+                . ReadingsVal( $hash->{NAME},
+                'powerwalls-wall_0_PackageSerialNumber', 0 )
+                . '","force_sm_off":false}';
+    }
+    elsif ( $path eq 'powerwallsstop'
+         || $path eq 'powerwallsruns' )
     {
-        $uri = $host . '/api/' . $cmdPaths{$path};
-    }
-    else {
-        $uri = $host . '/api/' . $paths{$path};
-    }
-
-    if ( $path eq 'sitemasterrun' ) {
-        $header = 'Authorization: Bearer' . $hash->{TOKEN};
-
-    }
-    elsif ( $path eq 'login' ) {
-        $method = 'POST';
-        $header = 'Content-Type: application/json';
-        $data   = '{"username":"","password":"S'
-          . ReadingsVal( $hash->{NAME},
-            'powerwalls-wall_0_PackageSerialNumber', 0 )
-          . '","force_sm_off":false}';
+        $uri        = $host . '/api/' . $cmdPaths{$path};
     }
 
     return ( $uri, $method, $header, $data, $path );
@@ -911,7 +940,7 @@ sub CreateUri($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.7.3",
+  "version": "v0.7.99",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
