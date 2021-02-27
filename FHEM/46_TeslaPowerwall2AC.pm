@@ -1079,9 +1079,9 @@ sub Rename {
     "Powerwall",
     "Control"
   ],
-  "release_status": "under develop",
+  "release_status": "stable",
   "license": "GPL_2",
-  "version": "v0.7.99",
+  "version": "v1.0.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
