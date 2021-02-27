@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2017-2020 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -144,6 +144,9 @@ BEGIN {
           readingsBulkUpdateIfChanged
           readingsBeginUpdate
           readingsEndUpdate
+          setKeyValue
+          getKeyValue
+          getUniqueId
           CommandAttr
           defs
           Log3
@@ -170,56 +173,61 @@ GP_Export(
 );
 
 my %paths = (
-    'statussoe'    => 'system_status/soe',
-    'aggregates'   => 'meters/aggregates',
-    'meterssite'   => 'meters/site',
-    'meterssolar'  => 'meters/solar',
-    'siteinfo'     => 'site_info',
-    'sitename'     => 'site_info/site_name',
-    'sitemaster'   => 'sitemaster',
-    'powerwalls'   => 'powerwalls',
-    'registration' => 'customer/registration',
-    'status'       => 'status',
-    'login'        => 'login/Basic',
-    'gridstatus'   => 'system_status/grid_status',
+    'statussoe'         => 'system_status/soe',
+    'aggregates'        => 'meters/aggregates',
+    'meterssite'        => 'meters/site',
+    'meterssolar'       => 'meters/solar',
+    'siteinfo'          => 'site_info',
+    'sitename'          => 'site_info/site_name',
+    'sitemaster'        => 'sitemaster',
+    'powerwalls'        => 'powerwalls',
+    'registration'      => 'customer/registration',
+    'status'            => 'status',
+    'gridstatus'        => 'system_status/grid_status',
 );
 
 my %cmdPaths = (
-    'powerwallsstop' => 'sitemaster/stop',
-    'powerwallsrun'  => 'sitemaster/run',
+    'powerwallsstop'    => 'sitemaster/stop',
+    'powerwallsrun'     => 'sitemaster/run',
 );
 
-sub Initialize($) {
+sub Initialize {
 
-    my ($hash) = @_;
+    my $hash = shift;
 
     # Consumer
-    $hash->{GetFn}    = 'FHEM::TeslaPowerwall2AC::Get';
-    $hash->{SetFn}    = 'FHEM::TeslaPowerwall2AC::Set';
-    $hash->{DefFn}    = 'FHEM::TeslaPowerwall2AC::Define';
-    $hash->{UndefFn}  = 'FHEM::TeslaPowerwall2AC::Undef';
-    $hash->{NotifyFn} = 'FHEM::TeslaPowerwall2AC::Notify';
+    $hash->{GetFn}    = \&Get;
+    $hash->{SetFn}    = \&Set;
+    $hash->{DefFn}    = \&Define;
+    $hash->{UndefFn}  = \&Undef;
+    $hash->{NotifyFn} = \&Notify;
+    $hash->{RenameFn} = \&Rename;
 
-    $hash->{AttrFn} = 'FHEM::TeslaPowerwall2AC::Attr';
+    $hash->{AttrFn} = \&Attr;
     $hash->{AttrList} =
-      'interval ' . 'disable:1 ' . 'devel:1 ' . $readingFnAttributes;
+              'interval '
+            . 'disable:1 '
+            . 'devel:1 '
+            . 'emailaddr '
+            . $readingFnAttributes;
+    $hash->{parseParams} = 1;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-sub Define($$) {
-    my ( $hash, $def ) = @_;
-    my @a = split( '[ \t][ \t]*', $def );
+sub Define {
+    my $hash = shift // return;
+    my $aArg = shift // return;    
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return 'too few parameters: define <name> TeslaPowerwall2AC <HOST>'
-      if ( @a != 3 );
+      if ( scalar( @{$aArg} ) != 3 );
 
-    my $name = $a[0];
+    my $name = $aArg->[0];
+    my $host = $aArg->[2];
 
-    my $host = $a[2];
     $hash->{HOST}        = $host;
     $hash->{INTERVAL}    = 300;
     $hash->{VERSION}     = version->parse($VERSION)->normal;
@@ -234,9 +242,9 @@ sub Define($$) {
     return undef;
 }
 
-sub Undef($$) {
-    my ( $hash, $arg ) = @_;
-    my $name = $hash->{NAME};
+sub Undef {
+    my $hash    = shift;
+    my $name    = shift;
 
     RemoveInternalTimer($hash);
     Log3 $name, 3, "TeslaPowerwall2AC ($name) - Device $name deleted";
@@ -244,7 +252,7 @@ sub Undef($$) {
     return undef;
 }
 
-sub Attr(@) {
+sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
 
@@ -289,7 +297,6 @@ sub Attr(@) {
                 $hash->{INTERVAL} = $attrVal;
                 Log3 $name, 3,
                   "TeslaPowerwall2AC ($name) - set interval to $attrVal";
-                Timer_GetData($hash);
             }
         }
         elsif ( $cmd eq 'del' ) {
@@ -297,16 +304,17 @@ sub Attr(@) {
             $hash->{INTERVAL} = 300;
             Log3 $name, 3,
               "TeslaPowerwall2AC ($name) - set interval to default";
-            Timer_GetData($hash);
         }
     }
 
     return undef;
 }
 
-sub Notify($$) {
-    my ( $hash, $dev ) = @_;
-    my $name = $hash->{NAME};
+sub Notify {
+    my $hash    = shift;
+    my $dev     = shift;
+    
+    my $name    = $hash->{NAME};
     return if ( IsDisabled($name) );
 
     my $devname = $dev->{NAME};
@@ -316,16 +324,24 @@ sub Notify($$) {
 
     Timer_GetData($hash)
       if (
-        grep /^INITIALIZED$/,
-        @{$events} or grep /^DELETEATTR.$name.disable$/,
-        @{$events} or grep /^DELETEATTR.$name.interval$/,
-        @{$events} or ( grep /^DEFINED.$name$/, @{$events} and $init_done )
+           ( grep /^INITIALIZED$/, @{$events}
+          or grep /^ATTR.$name.emailaddr$/, @{$events}
+          or grep /^ATTR.$name.interval$/, @{$events}
+          or grep /^ATTR.$name.disable$/, @{$events}
+          or grep /^DELETEATTR.$name.disable$/, @{$events}
+          or grep /^DELETEATTR.$name.interval$/, @{$events}
+          or grep /^DEFINED.$name$/, @{$events} )
+        and $init_done
       );
     return;
 }
 
-sub Get($@) {
-    my ( $hash, $name, $cmd ) = @_;
+sub Get {
+    my $hash = shift // return;
+    my $aArg = shift // return;
+
+    my $name = shift @$aArg;
+    my $cmd  = shift @$aArg // return qq{"get $name" needs at least one argument};
     my $arg;
 
     if ( $cmd eq 'statusSOE' ) {
@@ -365,8 +381,12 @@ sub Get($@) {
     }
     else {
 
-        my $list =
-'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg';
+        my $list = '';
+        $list .=
+'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg'
+  if(  AttrVal($name,'emailaddr','none') ne 'none'
+    && defined(ReadPassword($hash, $name))
+    && defined($hash->{TOKEN}) );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
     }
@@ -381,16 +401,34 @@ sub Get($@) {
     return undef;
 }
 
-sub Set($@) {
-    my ( $hash, $name, $cmd, @args ) = @_;
+sub Set {
+    my $hash = shift // return;
+    my $aArg = shift // return;
+
+    my $name = shift @$aArg;
+    my $cmd  = shift @$aArg // return qq{"set $name" needs at least one argument};
     my $arg;
 
     if ( $cmd eq 'powerwalls' ) {
-        $arg = lc( $cmd . $args[0] );
+        $arg = lc( $cmd . $aArg->[0] );
+    }
+    elsif ( lc $cmd eq 'setpassword' ) {
+        return "please set Attribut emailaddr first"
+          if ( AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
+        return "usage: $cmd <password>" if ( scalar( @{$aArg} ) != 1 );
+
+        StorePassword( $hash, $name, $aArg->[0] );
+        return Timer_GetData($hash);
+    }
+    elsif ( lc $cmd eq 'removepassword' ) {
+        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
+
+        DeletePassword($hash);
+        return Timer_GetData($hash);
     }
     else {
 
-        my $list = '';
+        my $list = ( defined(ReadPassword($hash, $name)) ? 'removePassword:noArg ' : 'setPassword ');
         $list .= 'powerwalls:run,stop'
           if ( AttrVal( $name, 'devel', 0 ) == 1 );
 
@@ -403,7 +441,7 @@ sub Set($@) {
     return undef;
 }
 
-sub Timer_GetData($) {
+sub Timer_GetData {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -412,16 +450,27 @@ sub Timer_GetData($) {
     if ( defined( $hash->{actionQueue} )
         and scalar( @{ $hash->{actionQueue} } ) == 0 )
     {
-        if ( not IsDisabled($name) ) {
-            while ( my $obj = each %paths ) {
-                unshift( @{ $hash->{actionQueue} }, $obj );
+        if ( !IsDisabled($name) ) {
+            return readingsSingleUpdate( $hash, 'state',
+              'please set Attribut emailaddr first', 1 )
+                if ( AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
+            return readingsSingleUpdate( $hash, 'state',
+              'please set password first', 1 )
+                if ( !defined( ReadPassword( $hash, $name ) ) );
+        
+            if ( !defined( $hash->{TOKEN}) ) {
+                unshift( @{ $hash->{actionQueue} }, 'login' );
+            }
+            else {
+                while ( my $obj = each %paths ) {
+                    unshift( @{ $hash->{actionQueue} }, $obj );
+                }
             }
 
             Write($hash);
-
         }
         else {
-            readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
+            return readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
         }
     }
 
@@ -431,8 +480,8 @@ sub Timer_GetData($) {
       "TeslaPowerwall2AC ($name) - Call InternalTimer Timer_GetData";
 }
 
-sub Write($) {
-    my ($hash) = @_;
+sub Write {
+    my $hash = shift;
     my $name = $hash->{NAME};
 
     my ( $uri, $method, $header, $data, $path ) =
@@ -464,10 +513,13 @@ sub Write($) {
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Send with URI: https://$uri";
 }
 
-sub ErrorHandling($$$) {
-    my ( $param, $err, $data ) = @_;
-    my $hash = $param->{hash};
-    my $name = $hash->{NAME};
+sub ErrorHandling {
+    my $param   = shift;
+    my $err     = shift;
+    my $data    = shift;
+    
+    my $hash    = $param->{hash};
+    my $name    = $hash->{NAME};
 
     ### Begin Error Handling
 
@@ -538,9 +590,12 @@ sub ErrorHandling($$$) {
     ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
 
-sub ResponseProcessing($$$) {
-    my ( $hash, $path, $json ) = @_;
-    my $name = $hash->{NAME};
+sub ResponseProcessing {
+    my $hash    = shift;
+    my $path    = shift;
+    my $json    = shift;
+
+    my $name    = $hash->{NAME};
     my $decode_json;
     my $readings;
 
@@ -570,7 +625,8 @@ sub ResponseProcessing($$$) {
         $readings = ReadingsProcessing_Powerwalls( $hash, $decode_json );
     }
     elsif ( $path eq 'login' ) {
-        return $hash->{TOKEN} = $decode_json->{token};
+        $hash->{TOKEN} = $decode_json->{token};
+        return Timer_GetData($hash);
     }
     elsif ( $path eq 'meterssite' ) {
         $readings = ReadingsProcessing_Meters_Site( $hash, $decode_json );
@@ -585,9 +641,12 @@ sub ResponseProcessing($$$) {
     WriteReadings( $hash, $path, $readings );
 }
 
-sub WriteReadings($$$) {
-    my ( $hash, $path, $readings ) = @_;
-    my $name = $hash->{NAME};
+sub WriteReadings {
+    my $hash        = shift;
+    my $path        = shift;
+    my $readings    = shift;
+
+    my $name        = $hash->{NAME};
 
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Write Readings";
 
@@ -610,6 +669,7 @@ sub WriteReadings($$$) {
             ) * ReadingsVal( $name, 'statussoe-percentage', 0 )
         )
     );
+
     readingsBulkUpdateIfChanged( $hash, 'actionQueue',
         scalar( @{ $hash->{actionQueue} } ) . ' entries in the Queue' );
     readingsBulkUpdateIfChanged(
@@ -623,12 +683,15 @@ sub WriteReadings($$$) {
               . ' paths in actionQueue'
         )
     );
+
     readingsEndUpdate( $hash, 1 );
 }
 
-sub ReadingsProcessing_Aggregates($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Aggregates {
+    my $hash        = shift;
+    my $decode_json = shift;
+    
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
@@ -645,9 +708,11 @@ sub ReadingsProcessing_Aggregates($$) {
     return \%readings;
 }
 
-sub ReadingsProcessing_Powerwalls($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Powerwalls {
+    my $hash        = shift;
+    my $decode_json = shift;
+    
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref( $decode_json->{powerwalls} ) eq 'ARRAY'
@@ -674,9 +739,11 @@ sub ReadingsProcessing_Powerwalls($$) {
     return \%readings;
 }
 
-sub ReadingsProcessing_Site_Info($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Site_Info {
+    my $hash        = shift;
+    my $decode_json = shift;
+
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
@@ -693,9 +760,11 @@ sub ReadingsProcessing_Site_Info($$) {
     return \%readings;
 }
 
-sub ReadingsProcessing_Meters_Site($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Meters_Site {
+    my $hash        = shift;
+    my $decode_json = shift;
+    
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'ARRAY'
@@ -704,7 +773,7 @@ sub ReadingsProcessing_Meters_Site($$) {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
                 if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
-                    or ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
+                    || ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
                 {
                     if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
                         while ( my ( $r, $v ) =
@@ -740,9 +809,11 @@ sub ReadingsProcessing_Meters_Site($$) {
     return \%readings;
 }
 
-sub ReadingsProcessing_Meters_Solar($$) {
-    my ( $hash, $decode_json ) = @_;
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Meters_Solar {
+    my $hash        = shift;
+    my $decode_json = shift;
+
+    my $name        = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'ARRAY'
@@ -751,7 +822,7 @@ sub ReadingsProcessing_Meters_Solar($$) {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
                 if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
-                    or ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
+                    || ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
                 {
                     if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
                         while ( my ( $r, $v ) =
@@ -787,37 +858,133 @@ sub ReadingsProcessing_Meters_Solar($$) {
     return \%readings;
 }
 
-sub CreateUri($$) {
-    my ( $hash, $path ) = @_;
-    my $host   = $hash->{HOST};
-    my $method = 'GET';
-    my $uri;
-    my $header;
+sub CreateUri {
+    my $hash        = shift;
+    my $path        = shift;
+
+    my $name        = $hash->{NAME};
+    my $host        = $hash->{HOST};
+    my $header      = ( defined($hash->{TOKEN}) ? 'Cookie: AuthCookie=' . $hash->{TOKEN} : undef );
+    my $method      = 'GET';
+    my $uri         = ( $path ne 'login' ? $host . '/api/' . $paths{$path} : $host . '/api/login/Basic' );
     my $data;
 
-    if (   $path eq 'powerwallsstop'
-        or $path eq 'powerwallsruns' )
+
+    if ( $path eq 'login' ) {
+        $method     = 'POST';
+        $header     = 'Content-Type: application/json';
+        $data       = 
+              '{"username":"customer","password":"'
+            . ReadPassword( $hash, $name )
+            . '","email":"'
+            . AttrVal($name,'emailaddr','test@test.de')
+            . '","force_sm_off":false}'
+    }
+    elsif ( $path eq 'powerwallsstop'
+         || $path eq 'powerwallsruns' )
     {
-        $uri = $host . '/api/' . $cmdPaths{$path};
-    }
-    else {
-        $uri = $host . '/api/' . $paths{$path};
-    }
-
-    if ( $path eq 'sitemasterrun' ) {
-        $header = 'Authorization: Bearer' . $hash->{TOKEN};
-
-    }
-    elsif ( $path eq 'login' ) {
-        $method = 'POST';
-        $header = 'Content-Type: application/json';
-        $data   = '{"username":"","password":"S'
-          . ReadingsVal( $hash->{NAME},
-            'powerwalls-wall_0_PackageSerialNumber', 0 )
-          . '","force_sm_off":false}';
+        $uri        = $host . '/api/' . $cmdPaths{$path};
     }
 
     return ( $uri, $method, $header, $data, $path );
+}
+
+sub StorePassword {
+    my $hash     = shift;
+    my $name     = shift;
+    my $password = shift;
+
+    my $index   = $hash->{TYPE} . "_" . $name . "_passwd";
+    my $key     = getUniqueId() . $index;
+    my $enc_pwd = "";
+
+    if ( eval "use Digest::MD5;1" ) {
+
+        $key = Digest::MD5::md5_hex( unpack "H*", $key );
+        $key .= Digest::MD5::md5_hex($key);
+    }
+
+    for my $char ( split //, $password ) {
+
+        my $encode = chop($key);
+        $enc_pwd .= sprintf( "%.2x", ord($char) ^ ord($encode) );
+        $key = $encode . $key;
+    }
+
+    my $err = setKeyValue( $index, $enc_pwd );
+    return "error while saving the password - $err" if ( defined($err) );
+
+    return "password successfully saved";
+}
+
+sub ReadPassword {
+    my $hash = shift;
+    my $name = shift;
+
+    my $index = $hash->{TYPE} . "_" . $name . "_passwd";
+    my $key   = getUniqueId() . $index;
+    my ( $password, $err );
+
+    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Read password from file";
+
+    ( $err, $password ) = getKeyValue($index);
+
+    if ( defined($err) ) {
+
+        Log3 $name, 3,
+"TeslaPowerwall2AC ($name) - unable to read password from file: $err";
+        return undef;
+
+    }
+
+    if ( defined($password) ) {
+        if ( eval "use Digest::MD5;1" ) {
+
+            $key = Digest::MD5::md5_hex( unpack "H*", $key );
+            $key .= Digest::MD5::md5_hex($key);
+        }
+
+        my $dec_pwd = '';
+
+        for my $char ( map { pack( 'C', hex($_) ) } ( $password =~ /(..)/g ) ) {
+
+            my $decode = chop($key);
+            $dec_pwd .= chr( ord($char) ^ ord($decode) );
+            $key = $decode . $key;
+        }
+
+        return $dec_pwd;
+
+    }
+    else {
+
+        Log3 $name, 3, "TeslaPowerwall2AC ($name) - No password in file";
+        return undef;
+    }
+
+    return;
+}
+
+
+
+sub DeletePassword {
+    my $hash    = shift;
+
+    setKeyValue( $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd", undef );
+
+    return;
+}
+
+sub Rename {
+    my $new     = shift;
+    my $old     = shift;
+
+    my $hash    = $defs{$new};
+
+    StorePassword( $hash, $new, ReadPassword( $hash, $old ) );
+    setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
+
+    return;
 }
 
 1;
@@ -865,6 +1032,8 @@ sub CreateUri($$) {
         <li>state           - information about internel modul processes</li>
         <li>status-*        - readings of the /api/status response</li>
         <li>statussoe-*     - readings of the /api/system_status/soe response</li>
+        <li>setPassword     - write password encrypted to password file</li>
+        <li>removePassword  - remove password from password file</li>
     </ul>
     <a name="TeslaPowerwall2ACget"></a>
     <b>get</b>
@@ -881,6 +1050,7 @@ sub CreateUri($$) {
     <b>Attribute</b>
     <ul>
         <li>interval - interval in seconds for automatically fetch data (default 300)</li>
+        <li>emailaddr - emailadress to get cookie token</li>
     </ul>
 </ul>
 
@@ -909,9 +1079,9 @@ sub CreateUri($$) {
     "Powerwall",
     "Control"
   ],
-  "release_status": "under develop",
+  "release_status": "stable",
   "license": "GPL_2",
-  "version": "v0.8.0",
+  "version": "v1.0.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
