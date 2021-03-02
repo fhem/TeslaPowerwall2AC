@@ -721,19 +721,21 @@ sub ReadingsProcessing_Powerwalls {
         my $i = 0;
         for my $powerwall ( @{ $decode_json->{powerwalls} } ) {
             if ( ref($powerwall) eq 'HASH' ) {
-
-                while ( my ( $r, $v ) = each %{$powerwall} ) {
+                while ( my ($r,$v) = each %{$powerwall} ) {
                     $readings{ 'wall_' . $i . '_' . $r } = $v
                       if ( ref($v) ne 'HASH' );
 
                     if ( ref($v) eq 'HASH' ) {
-                        while ( my ( $s, $ts ) = each %{$v} ) {
-                            if ( ref( $ts ) eq 'ARRAY'
-                              && scalar( @{ $ts } ) > 0 )
+                        while ( ($r,$v) = each %{$v} ) {
+                            if ( ref($v) eq 'ARRAY'
+                              && scalar( @{$v} ) > 0 )
                             {
                                 my $j = 0;
-                                for my $t ( @{ $ts } ) {
-                                    $readings{ 'wall_' . $i . '_' . $r . '_' . $s . '_' . $j } = $t;
+                                for ( @{ $v } ) {
+                                    my $text = $r;
+                                    while ( ($r,$v) = each %{$_} ) {
+                                        $readings{ 'wall_' . $i . '_' . $r . '_' . $text . '_' . $j . '_' . $r } = $v
+                                    }
                                     $j++;
                                 }
                             }
@@ -1096,7 +1098,7 @@ sub Rename {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.0.2",
+  "version": "v1.0.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
