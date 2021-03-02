@@ -1096,7 +1096,7 @@ sub Rename {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.0.2",
+  "version": "v1.0.4",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
