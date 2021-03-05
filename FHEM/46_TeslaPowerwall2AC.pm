@@ -725,22 +725,19 @@ sub ReadingsProcessing_Powerwalls {
                     $readings{ 'wall_' . $i . '_' . $r } = $v
                       if ( ref($v) ne 'HASH' );
 
-                    if ( ref($v) eq 'HASH' ) {
-                        while ( ($r,$v) = each %{$v} ) {
-                            if ( ref($v) eq 'ARRAY'
-                              && scalar( @{$v} ) > 0 )
-                            {
-                                my $j = 0;
-                                for ( @{ $v } ) {
-                                    my $text = $r;
-                                    while ( ($r,$v) = each %{$_} ) {
-                                        $readings{ 'wall_' . $i . '_' . $r . '_' . $text . '_' . $j . '_' . $r } = $v
-                                    }
-                                    $j++;
-                                }
-                            }
-                        }
-                    }
+#                     if ( ref($v) eq 'HASH' ) {
+#                         while ( my ( $s, $ts ) = each %{$v} ) {
+#                             if ( ref( $ts ) eq 'ARRAY'
+#                               && scalar( @{ $ts } ) > 0 )
+#                             {
+#                                 my $j = 0;
+#                                 for my $t ( @{ $ts } ) {
+#                                     $readings{ 'wall_' . $i . '_' . $r . '_' . $s . '_' . $j } = $t;
+#                                     $j++;
+#                                 }
+#                             }
+#                         }
+#                     }
                 }
 
                 $i++;
@@ -1098,7 +1095,7 @@ sub Rename {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.0.4",
+  "version": "v1.0.5",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
