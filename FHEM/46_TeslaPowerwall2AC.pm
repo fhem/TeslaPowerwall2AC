@@ -715,39 +715,58 @@ sub ReadingsProcessing_Powerwalls {
     my $name        = $hash->{NAME};
     my %readings;
 
-    if ( ref( $decode_json->{powerwalls} ) eq 'ARRAY'
-      && scalar( @{ $decode_json->{powerwalls} } ) > 0 )
-    {
-        my $i = 0;
-        for my $powerwall ( @{ $decode_json->{powerwalls} } ) {
-            if ( ref($powerwall) eq 'HASH' ) {
-                while ( my ($r,$v) = each %{$powerwall} ) {
-                    $readings{ 'wall_' . $i . '_' . $r } = $v
-                      if ( ref($v) ne 'HASH' );
+    if ( ref($decode_json) eq 'HASH' ) {
+        for (keys %{$jsondata}) {
+            $readings{$_} = $jsondata->{$_}
+            if (  ref($jsondata->{$_}) ne 'ARRAY'
+                and defined($jsondata->{$_}) );
+                
+            if ( ref($jsondata->{$_}) eq 'ARRAY' ) {
+                my $i = 0;
+                my $r1 = $_;
+                for my $hRef (@{$jsondata->{$_}}) {
+                    for (keys %{$hRef}) {
+                        $r1 =~ s/s$//g;
+                        $readings{qq(${r1}_${i}_${_})} = $hRef->{$_}
+                        if (  ref($hRef->{$_}) ne 'ARRAY'
+                            and ref($hRef->{$_}) ne 'HASH'
+                            and defined($hRef->{$_}) );
+                            
+                        if ( ref($hRef->{$_}) eq 'HASH' ) {
+                            my $r2 = $_;
+                            my $r3 = $hRef->{$_};
+                            for (keys %{$r3}) {
+                                $readings{qq(${r1}_${i}_${r2}_${_})} = $r3->{$_}
+                                if (  ref($r3->{$_}) ne 'ARRAY'
+                                    and defined($r3->{$_}) );
 
-#                     if ( ref($v) eq 'HASH' ) {
-#                         while ( my ( $s, $ts ) = each %{$v} ) {
-#                             if ( ref( $ts ) eq 'ARRAY'
-#                               && scalar( @{ $ts } ) > 0 )
-#                             {
-#                                 my $j = 0;
-#                                 for my $t ( @{ $ts } ) {
-#                                     $readings{ 'wall_' . $i . '_' . $r . '_' . $s . '_' . $j } = $t;
-#                                     $j++;
-#                                 }
-#                             }
-#                         }
-#                     }
+                                if ( ref($r3->{$_}) eq 'ARRAY' ) {
+                                    my $ii = 0;
+                                    my $r4 = $_;
+                                    for $hRef (@{$r3->{$_}}) {
+                                        for (keys %{$hRef}) {
+                                            $r4 =~ s/s$//g;
+                                            $readings{qq(${r1}_${i}_${r2}_${r4}_${ii}_${_})} = $hRef->{$_}
+                                            if (  ref($hRef->{$_}) ne 'HASH'
+                                                and defined($hRef->{$_}) );
+                                        }
+
+                                        $ii++
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    $i++;
                 }
 
-                $i++;
+                $readings{'numberOfWalls'} = $i;
             }
         }
-
-        $readings{'numberOfWalls'} = $i;
     }
     else {
-        $readings{'error'} = 'aggregates response is not a Array';
+        $readings{'error'} = 'powerwalls response is not a Hash';
     }
 
     return \%readings;
@@ -1095,7 +1114,7 @@ sub Rename {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.0.5",
+  "version": "v1.0.6",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
