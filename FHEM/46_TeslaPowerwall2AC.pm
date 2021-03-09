@@ -216,13 +216,13 @@ sub Initialize {
 }
 
 sub Define {
-    my $hash = shift // return;
-    my $aArg = shift // return;    
+    my $hash = shift;
+    my $aArg = shift;    
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
-    return 'too few parameters: define <name> TeslaPowerwall2AC <HOST>'
+    return q{too few parameters: define <name> TeslaPowerwall2AC <HOST>}
       if ( scalar( @{$aArg} ) != 3 );
 
     my $name = $aArg->[0];
@@ -231,15 +231,15 @@ sub Define {
     $hash->{HOST}        = $host;
     $hash->{INTERVAL}    = 300;
     $hash->{VERSION}     = version->parse($VERSION)->normal;
-    $hash->{NOTIFYDEV}   = "global,$name";
+    $hash->{NOTIFYDEV}   = qq(global,${name});
     $hash->{actionQueue} = [];
 
-    CommandAttr( undef, $name . ' room Tesla' )
+    CommandAttr( undef, $name . q{ room Tesla} )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
-    Log3 $name, 3,
-"TeslaPowerwall2AC ($name) - defined TeslaPowerwall2AC Device with Host $host and Interval $hash->{INTERVAL}";
+    Log3($name, 3,
+qq(TeslaPowerwall2AC \(${name}\) - defined TeslaPowerwall2AC Device with Host ${host} and Interval $hash->{INTERVAL}));
 
-    return undef;
+    return;
 }
 
 sub Undef {
@@ -247,9 +247,9 @@ sub Undef {
     my $name    = shift;
 
     RemoveInternalTimer($hash);
-    Log3 $name, 3, "TeslaPowerwall2AC ($name) - Device $name deleted";
+    Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - Device ${name} deleted));
 
-    return undef;
+    return;
 }
 
 sub Attr {
@@ -260,11 +260,11 @@ sub Attr {
         if ( $cmd eq 'set' and $attrVal eq '1' ) {
             RemoveInternalTimer($hash);
             readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
-            Log3 $name, 3, "TeslaPowerwall2AC ($name) - disabled";
+            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - disabled));
 
         }
         elsif ( $cmd eq 'del' ) {
-            Log3 $name, 3, "TeslaPowerwall2AC ($name) - enabled";
+            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - enabled));
         }
     }
 
@@ -273,12 +273,12 @@ sub Attr {
             return
 'check disabledForIntervals Syntax HH:MM-HH:MM or \'HH:MM-HH:MM HH:MM-HH:MM ...\''
               unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
-            Log3 $name, 3, "TeslaPowerwall2AC ($name) - disabledForIntervals";
+            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - disabledForIntervals));
             readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
 
         }
         elsif ( $cmd eq 'del' ) {
-            Log3 $name, 3, "TeslaPowerwall2AC ($name) - enabled";
+            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - enabled));
             readingsSingleUpdate( $hash, 'state', 'active', 1 );
         }
     }
@@ -286,28 +286,30 @@ sub Attr {
     if ( $attrName eq 'interval' ) {
         if ( $cmd eq 'set' ) {
             if ( $attrVal < 60 ) {
-                Log3 $name, 3,
-"TeslaPowerwall2AC ($name) - interval too small, please use something >= 60 (sec), default is 300 (sec)";
+                Log3($name, 3,
+qq(TeslaPowerwall2AC \(${name}\) - interval too small, please use something >= 60 (sec), default is 300 (sec)));
                 return
-'interval too small, please use something >= 60 (sec), default is 300 (sec)';
+q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
 
             }
             else {
                 RemoveInternalTimer($hash);
                 $hash->{INTERVAL} = $attrVal;
-                Log3 $name, 3,
-                  "TeslaPowerwall2AC ($name) - set interval to $attrVal";
+                Log3($name, 3,
+                  qq(TeslaPowerwall2AC \(${name}\) - set interval to ${attrVal}));
+                Timer_GetData($hash);
             }
         }
         elsif ( $cmd eq 'del' ) {
             RemoveInternalTimer($hash);
             $hash->{INTERVAL} = 300;
-            Log3 $name, 3,
-              "TeslaPowerwall2AC ($name) - set interval to default";
+            Log3($name, 3,
+              qq(TeslaPowerwall2AC \(${name}\) - set interval to default));
+            Timer_GetData($hash);
         }
     }
 
-    return undef;
+    return;
 }
 
 sub Notify {
@@ -326,8 +328,6 @@ sub Notify {
       if (
            ( grep /^INITIALIZED$/, @{$events}
           or grep /^ATTR.$name.emailaddr$/, @{$events}
-          or grep /^ATTR.$name.interval$/, @{$events}
-          or grep /^ATTR.$name.disable$/, @{$events}
           or grep /^DELETEATTR.$name.disable$/, @{$events}
           or grep /^DELETEATTR.$name.interval$/, @{$events}
           or grep /^DEFINED.$name$/, @{$events} )
@@ -337,8 +337,8 @@ sub Notify {
 }
 
 sub Get {
-    my $hash = shift // return;
-    my $aArg = shift // return;
+    my $hash = shift;
+    my $aArg = shift;
 
     my $name = shift @$aArg;
     my $cmd  = shift @$aArg // return qq{"get $name" needs at least one argument};
@@ -398,15 +398,15 @@ sub Get {
     unshift( @{ $hash->{actionQueue} }, $arg );
     Write($hash);
 
-    return undef;
+    return;
 }
 
 sub Set {
-    my $hash = shift // return;
-    my $aArg = shift // return;
+    my $hash = shift;
+    my $aArg = shift;
 
     my $name = shift @$aArg;
-    my $cmd  = shift @$aArg // return qq{"set $name" needs at least one argument};
+    my $cmd  = shift @$aArg // return qq(set ${name} needs at least one argument);
     my $arg;
 
     if ( $cmd eq 'powerwalls' ) {
@@ -438,7 +438,7 @@ sub Set {
     unshift( @{ $hash->{actionQueue} }, $arg );
     Write($hash);
 
-    return undef;
+    return;
 }
 
 sub Timer_GetData {
@@ -716,15 +716,15 @@ sub ReadingsProcessing_Powerwalls {
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
-        for (keys %{$jsondata}) {
-            $readings{$_} = $jsondata->{$_}
-            if (  ref($jsondata->{$_}) ne 'ARRAY'
-                and defined($jsondata->{$_}) );
+        for (keys %{$decode_json}) {
+            $readings{$_} = $decode_json->{$_}
+            if (  ref($decode_json->{$_}) ne 'ARRAY'
+                and defined($decode_json->{$_}) );
                 
-            if ( ref($jsondata->{$_}) eq 'ARRAY' ) {
+            if ( ref($decode_json->{$_}) eq 'ARRAY' ) {
                 my $i = 0;
                 my $r1 = $_;
-                for my $hRef (@{$jsondata->{$_}}) {
+                for my $hRef (@{$decode_json->{$_}}) {
                     for (keys %{$hRef}) {
                         $r1 =~ s/s$//g;
                         $readings{qq(${r1}_${i}_${_})} = $hRef->{$_}
@@ -966,7 +966,7 @@ sub ReadPassword {
 
         Log3 $name, 3,
 "TeslaPowerwall2AC ($name) - unable to read password from file: $err";
-        return undef;
+        return;
 
     }
 
@@ -992,7 +992,7 @@ sub ReadPassword {
     else {
 
         Log3 $name, 3, "TeslaPowerwall2AC ($name) - No password in file";
-        return undef;
+        return;
     }
 
     return;
