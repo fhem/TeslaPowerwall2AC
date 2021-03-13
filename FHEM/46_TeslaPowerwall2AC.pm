@@ -257,7 +257,7 @@ sub Attr {
     my $hash = $defs{$name};
 
     if ( $attrName eq 'disable' ) {
-        if ( $cmd eq 'set' and $attrVal eq '1' ) {
+        if ( $cmd eq 'set' && $attrVal eq '1' ) {
             RemoveInternalTimer($hash);
             readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
             Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - disabled));
@@ -393,7 +393,7 @@ sub Get {
 
     return 'There are still path commands in the action queue'
       if ( defined( $hash->{actionQueue} )
-        and scalar( @{ $hash->{actionQueue} } ) > 0 );
+        && scalar( @{ $hash->{actionQueue} } ) > 0 );
 
     unshift( @{ $hash->{actionQueue} }, $arg );
     Write($hash);
@@ -448,7 +448,7 @@ sub Timer_GetData {
     RemoveInternalTimer($hash);
 
     if ( defined( $hash->{actionQueue} )
-        and scalar( @{ $hash->{actionQueue} } ) == 0 )
+      && scalar( @{ $hash->{actionQueue} } ) == 0 )
     {
         if ( !IsDisabled($name) ) {
             return readingsSingleUpdate( $hash, 'state',
@@ -538,7 +538,10 @@ sub ErrorHandling {
         }
     }
 
-    if ( $data eq '' and exists( $param->{code} ) && $param->{code} != 200 ) {
+    if ( $data eq ''
+      && exists($param->{code})
+      && $param->{code} != 200 )
+    {
 
         readingsBeginUpdate($hash);
         readingsBulkUpdate( $hash, 'state', $param->{code}, 1 );
@@ -583,7 +586,7 @@ sub ErrorHandling {
 
     InternalTimer( gettimeofday() + 3, 'TeslaPowerwall2AC_Write', $hash )
       if ( defined( $hash->{actionQueue} )
-        and scalar( @{ $hash->{actionQueue} } ) > 0 );
+        && scalar( @{ $hash->{actionQueue} } ) > 0 );
 
     Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
 
@@ -610,11 +613,11 @@ sub ResponseProcessing {
     }
 
     return
-      if (  ref($decode_json) eq 'HASH'
-        and defined( $decode_json->{error} )
-        and $decode_json->{error}
-        and defined( $decode_json->{code} )
-        and $decode_json->{code} );
+      if ( ref($decode_json) eq 'HASH'
+        && defined($decode_json->{error})
+        && $decode_json->{error}
+        && defined($decode_json->{code})
+        && $decode_json->{code} );
 
     #### Verarbeitung der Readings zum passenden Path
 
@@ -676,7 +679,7 @@ sub WriteReadings {
         $hash, 'state',
         (
             defined( $hash->{actionQueue} )
-              and scalar( @{ $hash->{actionQueue} } ) == 0
+              && scalar( @{ $hash->{actionQueue} } ) == 0
             ? 'ready'
             : 'fetch data - '
               . scalar( @{ $hash->{actionQueue} } )
@@ -718,8 +721,8 @@ sub ReadingsProcessing_Powerwalls {
     if ( ref($decode_json) eq 'HASH' ) {
         for (keys %{$decode_json}) {
             $readings{$_} = $decode_json->{$_}
-            if (  ref($decode_json->{$_}) ne 'ARRAY'
-                and defined($decode_json->{$_}) );
+            if ( ref($decode_json->{$_}) ne 'ARRAY'
+              && defined($decode_json->{$_}) );
                 
             if ( ref($decode_json->{$_}) eq 'ARRAY' ) {
                 my $i = 0;
@@ -728,17 +731,17 @@ sub ReadingsProcessing_Powerwalls {
                     for (keys %{$hRef}) {
                         $r1 =~ s/s$//g;
                         $readings{qq(${r1}_${i}_${_})} = $hRef->{$_}
-                        if (  ref($hRef->{$_}) ne 'ARRAY'
-                            and ref($hRef->{$_}) ne 'HASH'
-                            and defined($hRef->{$_}) );
+                        if ( ref($hRef->{$_}) ne 'ARRAY'
+                          && ref($hRef->{$_}) ne 'HASH'
+                          && defined($hRef->{$_}) );
                             
                         if ( ref($hRef->{$_}) eq 'HASH' ) {
                             my $r2 = $_;
                             my $r3 = $hRef->{$_};
                             for (keys %{$r3}) {
                                 $readings{qq(${r1}_${i}_${r2}_${_})} = $r3->{$_}
-                                if (  ref($r3->{$_}) ne 'ARRAY'
-                                    and defined($r3->{$_}) );
+                                if ( ref($r3->{$_}) ne 'ARRAY'
+                                  && defined($r3->{$_}) );
 
                                 if ( ref($r3->{$_}) eq 'ARRAY' ) {
                                     my $ii = 0;
@@ -747,8 +750,8 @@ sub ReadingsProcessing_Powerwalls {
                                         for (keys %{$hRef}) {
                                             $r4 =~ s/s$//g;
                                             $readings{qq(${r1}_${i}_${r2}_${r4}_${ii}_${_})} = $hRef->{$_}
-                                            if (  ref($hRef->{$_}) ne 'HASH'
-                                                and defined($hRef->{$_}) );
+                                            if ( ref($hRef->{$_}) ne 'HASH'
+                                              && defined($hRef->{$_}) );
                                         }
 
                                         $ii++
@@ -801,7 +804,7 @@ sub ReadingsProcessing_Meters_Site {
     my %readings;
 
     if ( ref($decode_json) eq 'ARRAY'
-        and scalar( @{$decode_json} ) > 0 )
+      && scalar( @{$decode_json} ) > 0 )
     {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
@@ -850,7 +853,7 @@ sub ReadingsProcessing_Meters_Solar {
     my %readings;
 
     if ( ref($decode_json) eq 'ARRAY'
-        and scalar( @{$decode_json} ) > 0 )
+      && scalar( @{$decode_json} ) > 0 )
     {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
@@ -1019,6 +1022,36 @@ sub Rename {
 
     return;
 }
+
+# My little Helpers
+sub PathTimestamp {
+    my $hash = shift;
+    my $path = shift // return;
+
+    $hash->{helper}->{pathTimestamp}->{$path}->{TIME} =
+      gettimeofday();
+}
+
+sub PathTimeAge {
+    my $hash = shift;
+    my $path = shift;
+
+    $hash->{helper}{updateTimeCallBattery} = 0
+      if ( not defined( $hash->{helper}{updateTimeCallBattery} ) );
+    my $UpdateTimeAge = gettimeofday() - $hash->{helper}{updateTimeCallBattery};
+
+    return $UpdateTimeAge;
+}
+
+sub IsPathTimeAgeToOld {
+    my $hash   = shift;
+    my $maxAge = shift;
+
+    return ( CallBattery_UpdateTimeAge($hash) > $maxAge ? 1 : 0 );
+}
+
+
+
 
 1;
 
