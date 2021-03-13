@@ -341,7 +341,7 @@ sub Get {
     my $aArg = shift;
 
     my $name = shift @$aArg;
-    my $cmd  = shift @$aArg // return qq{"get $name" needs at least one argument};
+    my $cmd  = shift @$aArg // return qq(get ${name} needs at least one argument);
     my $arg;
 
     if ( $cmd eq 'statusSOE' ) {
@@ -430,7 +430,9 @@ sub Set {
 
         my $list = ( defined(ReadPassword($hash, $name)) ? 'removePassword:noArg ' : 'setPassword ');
         $list .= 'powerwalls:run,stop'
-          if ( AttrVal( $name, 'devel', 0 ) == 1 );
+          if ( AttrVal( $name, 'devel', 0 ) == 1
+            && defined(ReadPassword($hash, $name))
+            && defined($hash->{TOKEN}) );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
     }
@@ -476,8 +478,8 @@ sub Timer_GetData {
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL},
         'TeslaPowerwall2AC_Timer_GetData', $hash );
-    Log3 $name, 4,
-      "TeslaPowerwall2AC ($name) - Call InternalTimer Timer_GetData";
+    Log3($name, 4,
+      qq(TeslaPowerwall2AC \(${name}\) - Call InternalTimer Timer_GetData));
 }
 
 sub Write {
@@ -510,7 +512,7 @@ sub Write {
         }
     );
 
-    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Send with URI: https://$uri";
+    Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - Send with URI: https://${uri}));
 }
 
 sub ErrorHandling {
@@ -531,7 +533,7 @@ sub ErrorHandling {
             readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
             readingsEndUpdate( $hash, 1 );
 
-            Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
+            Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - RequestERROR: ${err}));
 
             $hash->{actionQueue} = [];
             return;
@@ -548,15 +550,15 @@ sub ErrorHandling {
 
         readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
 
-        Log3 $name, 3,
-          "TeslaPowerwall2AC ($name) - RequestERROR: " . $param->{code};
+        Log3($name, 3,
+          qq(TeslaPowerwall2AC \(${name}\) - RequestERROR: " . $param->{code}));
 
         readingsEndUpdate( $hash, 1 );
 
-        Log3 $name, 5,
-            "TeslaPowerwall2AC ($name) - RequestERROR: received http code "
+        Log3($name, 5,
+            qq(TeslaPowerwall2AC \(${name}\) - RequestERROR: received http code "
           . $param->{code}
-          . " without any data after requesting";
+          . " without any data after requesting));
 
         $hash->{actionQueue} = [];
         return;
@@ -588,7 +590,7 @@ sub ErrorHandling {
       if ( defined( $hash->{actionQueue} )
         && scalar( @{ $hash->{actionQueue} } ) > 0 );
 
-    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
+    Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - Recieve JSON data: ${data}));
 
     ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
@@ -604,7 +606,7 @@ sub ResponseProcessing {
 
     $decode_json = eval { decode_json($json) };
     if ($@) {
-        Log3 $name, 4, "TeslaPowerwall2AC ($name) - error while request: $@";
+        Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - error while request: $@));
         readingsBeginUpdate($hash);
         readingsBulkUpdate( $hash, 'JSON Error', $@ );
         readingsBulkUpdate( $hash, 'state',      'JSON error' );
@@ -651,7 +653,7 @@ sub WriteReadings {
 
     my $name        = $hash->{NAME};
 
-    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Write Readings";
+    Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - Write Readings));
 
     readingsBeginUpdate($hash);
     while ( my ( $r, $v ) = each %{$readings} ) {
@@ -705,7 +707,7 @@ sub ReadingsProcessing_Aggregates {
         }
     }
     else {
-        $readings{'error'} = 'aggregates response is not a Hash';
+        $readings{'error'} = q{aggregates response is not a Hash};
     }
 
     return \%readings;
@@ -769,7 +771,7 @@ sub ReadingsProcessing_Powerwalls {
         }
     }
     else {
-        $readings{'error'} = 'powerwalls response is not a Hash';
+        $readings{'error'} = q{powerwalls response is not a Hash};
     }
 
     return \%readings;
@@ -790,7 +792,7 @@ sub ReadingsProcessing_Site_Info {
         }
     }
     else {
-        $readings{'error'} = 'siteinfo response is not a Hash';
+        $readings{'error'} = q{siteinfo response is not a Hash};
     }
 
     return \%readings;
@@ -839,7 +841,7 @@ sub ReadingsProcessing_Meters_Site {
         }
     }
     else {
-        $readings{'error'} = 'metes site response is not a Array';
+        $readings{'error'} = q{metes site response is not a Array};
     }
 
     return \%readings;
@@ -888,7 +890,7 @@ sub ReadingsProcessing_Meters_Solar {
         }
     }
     else {
-        $readings{'error'} = 'metes solar response is not a Array';
+        $readings{'error'} = q{metes solar response is not a Array};
     }
 
     return \%readings;
@@ -930,11 +932,11 @@ sub StorePassword {
     my $name     = shift;
     my $password = shift;
 
-    my $index   = $hash->{TYPE} . "_" . $name . "_passwd";
+    my $index   = $hash->{TYPE} . q{_} . $name . q{_passwd};
     my $key     = getUniqueId() . $index;
-    my $enc_pwd = "";
+    my $enc_pwd = q{};
 
-    if ( eval "use Digest::MD5;1" ) {
+    if ( eval qq(use Digest::MD5;1) ) {
 
         $key = Digest::MD5::md5_hex( unpack "H*", $key );
         $key .= Digest::MD5::md5_hex($key);
@@ -948,33 +950,34 @@ sub StorePassword {
     }
 
     my $err = setKeyValue( $index, $enc_pwd );
-    return "error while saving the password - $err" if ( defined($err) );
+    return qq(error while saving the password - ${err})
+      if ( defined($err) );
 
-    return "password successfully saved";
+    return q{password successfully saved};
 }
 
 sub ReadPassword {
     my $hash = shift;
     my $name = shift;
 
-    my $index = $hash->{TYPE} . "_" . $name . "_passwd";
+    my $index = $hash->{TYPE} . q{_} . $name . q{_passwd};
     my $key   = getUniqueId() . $index;
     my ( $password, $err );
 
-    Log3 $name, 4, "TeslaPowerwall2AC ($name) - Read password from file";
+    Log3($name, 4, qq(TeslaPowerwall2AC \(${name}\) - Read password from file));
 
     ( $err, $password ) = getKeyValue($index);
 
     if ( defined($err) ) {
 
-        Log3 $name, 3,
-"TeslaPowerwall2AC ($name) - unable to read password from file: $err";
+        Log3($name, 3,
+qq(TeslaPowerwall2AC \(${name}\) - unable to read password from file: ${err}));
         return;
 
     }
 
     if ( defined($password) ) {
-        if ( eval "use Digest::MD5;1" ) {
+        if ( eval qq(use Digest::MD5;1) ) {
 
             $key = Digest::MD5::md5_hex( unpack "H*", $key );
             $key .= Digest::MD5::md5_hex($key);
@@ -994,7 +997,7 @@ sub ReadPassword {
     }
     else {
 
-        Log3 $name, 3, "TeslaPowerwall2AC ($name) - No password in file";
+        Log3($name, 3, qq(TeslaPowerwall2AC \(${name}\) - No password in file));
         return;
     }
 
@@ -1006,7 +1009,7 @@ sub ReadPassword {
 sub DeletePassword {
     my $hash    = shift;
 
-    setKeyValue( $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd", undef );
+    setKeyValue( $hash->{TYPE} . q{_} . $hash->{NAME} . q{_passwd}, undef );
 
     return;
 }
@@ -1018,7 +1021,7 @@ sub Rename {
     my $hash    = $defs{$new};
 
     StorePassword( $hash, $new, ReadPassword( $hash, $old ) );
-    setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
+    setKeyValue( $hash->{TYPE} . q{_} . $old . q{_passwd}, undef );
 
     return;
 }
@@ -1147,7 +1150,7 @@ sub IsPathTimeAgeToOld {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.0.6",
+  "version": "v1.0.7",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
