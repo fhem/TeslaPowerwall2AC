@@ -455,7 +455,7 @@ sub Timer_GetData {
     }
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL},
-        'Tesla_Powerwall_Timer_GetData', $hash );
+        'Powerwall_Timer_GetData', $hash );
     Log3($name, 4,
       qq(TeslaPowerwall2AC \(${name}\) - Call InternalTimer Timer_GetData));
 }
@@ -564,7 +564,7 @@ sub ErrorHandling {
     }
     #### End Error Handling
 
-    InternalTimer( gettimeofday() + 3, 'Tesla_Powerwall_Write', $hash )
+    InternalTimer( gettimeofday() + 3, 'Powerwall_Write', $hash )
       if ( defined( $hash->{actionQueue} )
         && scalar( @{ $hash->{actionQueue} } ) > 0 );
 
