@@ -56,7 +56,6 @@ package FHEM::Tesla::Poerwall;
 
 use strict;
 use warnings;
-use FHEM::Meta;
 use GPUtils qw(GP_Import GP_Export);
 use HttpUtils;
 use Data::Dumper;
