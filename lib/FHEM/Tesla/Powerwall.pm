@@ -52,7 +52,7 @@
 ##
 ##
 
-package FHEM::Tesla::Poerwall;
+package FHEM::Tesla::Powerwall;
 
 use strict;
 use warnings;
@@ -165,9 +165,9 @@ BEGIN {
 #-- Export to main context with different name
 GP_Export(
     qw(
-      Initialize
-      Timer_GetData
-      Write
+        Initialize
+        Timer_GetData
+        Write
       )
 );
 
@@ -455,7 +455,7 @@ sub Timer_GetData {
     }
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL},
-        'TeslaPowerwall2AC_Timer_GetData', $hash );
+        'Tesla_Powerwall_Timer_GetData', $hash );
     Log3($name, 4,
       qq(TeslaPowerwall2AC \(${name}\) - Call InternalTimer Timer_GetData));
 }

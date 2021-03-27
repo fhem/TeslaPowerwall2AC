@@ -84,20 +84,21 @@ sub Initialize {
 
     my $hash            = shift;
 
-    $hash->{GetFn}          = 'FHEM::Tesla::Poerwall::Get';
-    $hash->{SetFn}          = 'FHEM::Tesla::Poerwall::Set';
-    $hash->{DefFn}          = 'FHEM::Tesla::Poerwall::Define';
-    $hash->{UndefFn}        = 'FHEM::Tesla::Poerwall::Undef';
-    $hash->{NotifyFn}       = 'FHEM::Tesla::Poerwall::Notify';
-    $hash->{RenameFn}       = 'FHEM::Tesla::Poerwall::Rename';
+    $hash->{GetFn}          = 'FHEM::Tesla::Powerwall::Get';
+    $hash->{SetFn}          = 'FHEM::Tesla::Powerwall::Set';
+    $hash->{DefFn}          = 'FHEM::Tesla::Powerwall::Define';
+    $hash->{UndefFn}        = 'FHEM::Tesla::Powerwall::Undef';
+    $hash->{NotifyFn}       = 'FHEM::Tesla::Powerwall::Notify';
+    $hash->{RenameFn}       = 'FHEM::Tesla::Powerwall::Rename';
 
-    $hash->{AttrFn}         = 'FHEM::Tesla::Poerwall::Attr';
+    $hash->{AttrFn}         = 'FHEM::Tesla::Powerwall::Attr';
     $hash->{AttrList}       =
-                    'interval '
+                      'interval '
                     . 'disable:1 '
                     . 'devel:1 '
                     . 'emailaddr '
                     . $readingFnAttributes;
+
     $hash->{parseParams}    = 1;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
