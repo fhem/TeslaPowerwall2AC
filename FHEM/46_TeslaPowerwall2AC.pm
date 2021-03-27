@@ -404,20 +404,22 @@ sub Get {
 sub Set {
     my $hash = shift;
     my $aArg = shift;
+    my $hArg = shift;
 
     my $name = shift @$aArg;
     my $cmd  = shift @$aArg // return qq(set ${name} needs at least one argument);
     my $arg;
 
+
     if ( $cmd eq 'powerwalls' ) {
         $arg = lc( $cmd . $aArg->[0] );
     }
     elsif ( lc $cmd eq 'setpassword' ) {
-        return "please set Attribut emailaddr first"
+        return q{please set Attribut emailaddr first}
           if ( AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
-        return "usage: $cmd <password>" if ( scalar( @{$aArg} ) != 1 );
+        return qq(usage: ${cmd} pass=<password>) if ( scalar( @{$aArg} ) != 2 );
 
-        StorePassword( $hash, $name, $aArg->[0] );
+        StorePassword( $hash, $name, $hArg->{'pass'} );
         return Timer_GetData($hash);
     }
     elsif ( lc $cmd eq 'removepassword' ) {
@@ -1115,6 +1117,14 @@ sub IsPathTimeAgeToOld {
         <li>status          - fetch data from url path /api/status</li>
         <li>statussoe       - fetch data from url path /api/system_status/soe</li>
     </ul>
+    <br><br>
+    <a name="TeslaPowerwall2ACset"></a>
+    <b>set</b>
+    <ul>
+        <li>removePassword  - remove password from password file</li>
+        <li>setPassword     - save password in passswordfile ATTANTION!!! text must begin with pass= (Example: pass=meinpassword)</li>
+    </ul>
+    <br><br>
     <a name="TeslaPowerwall2ACattribute"></a>
     <b>Attribute</b>
     <ul>
