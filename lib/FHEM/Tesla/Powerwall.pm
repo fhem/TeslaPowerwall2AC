@@ -564,7 +564,7 @@ sub ErrorHandling {
     }
     #### End Error Handling
 
-    InternalTimer( gettimeofday() + 3, 'TeslaPowerwall2AC_Write', $hash )
+    InternalTimer( gettimeofday() + 3, 'Tesla_Powerwall_Write', $hash )
       if ( defined( $hash->{actionQueue} )
         && scalar( @{ $hash->{actionQueue} } ) > 0 );
 
