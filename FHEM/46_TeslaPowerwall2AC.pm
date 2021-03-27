@@ -59,7 +59,7 @@ use warnings;
 use FHEM::Meta;
 use GPUtils qw(GP_Import GP_Export);
 
-require FHEM::Tesla::Poerwall;
+require FHEM::Tesla::Powerwall;
 
 ## Import der FHEM Funktionen
 #-- Run before package compilation
