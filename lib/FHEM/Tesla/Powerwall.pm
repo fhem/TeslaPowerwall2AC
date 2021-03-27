@@ -392,7 +392,8 @@ sub Set {
     elsif ( lc $cmd eq 'setpassword' ) {
         return q{please set Attribut emailaddr first}
           if ( AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
-        return qq(usage: ${cmd} pass=<password>) if ( scalar( @{$aArg} ) != 2 );
+        return qq(usage: ${cmd} pass=<password>) if ( scalar( @{$aArg} ) != 2
+                                                   || scalar(keys %{$hArg} != 1 );
 
         StorePassword( $hash, $name, $hArg->{'pass'} );
         return Timer_GetData($hash);
