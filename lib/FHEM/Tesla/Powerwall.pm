@@ -1035,12 +1035,12 @@ sub Rename {
     ($passResp,$passErr) = $hash->{helper}->{passObj}->setRename($new,$old);
     
     ::Log3($new, 1,
-qq(TeslaPowerwall2AC \(${new}\) - error while change the password hash after rename - $passErr)
+qq(TeslaPowerwall2AC \(${new}\) - error while change the password hash after rename - $passErr))
         if ( !defined($passResp)
         and defined($passErr) );
 
     ::Log3($new, 1,
-qq(TeslaPowerwall2AC \(${new}\) - change password hash after rename successfully)
+qq(TeslaPowerwall2AC \(${new}\) - change password hash after rename successfully))
         if ( defined($passResp)
         and !defined($passErr) );
 
