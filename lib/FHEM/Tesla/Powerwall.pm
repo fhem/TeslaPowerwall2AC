@@ -1028,17 +1028,19 @@ sub DeletePassword {
 sub Rename {
     my $new     = shift;
     my $old     = shift;
+    
+    my $hash    = $::defs{$new};
 
     my ($passResp,$passErr);
     ($passResp,$passErr) = $hash->{helper}->{passObj}->setRename($new,$old);
     
-    ::Log3($name, 1,
-qq(TeslaPowerwall2AC \(${name}\) - error while change the password hash after rename - $passErr)
+    ::Log3($new, 1,
+qq(TeslaPowerwall2AC \(${new}\) - error while change the password hash after rename - $passErr)
         if ( !defined($passResp)
         and defined($passErr) );
 
-    ::Log3($name, 1,
-qq(TeslaPowerwall2AC \(${name}\) - change password hash after rename successfully)
+    ::Log3($new, 1,
+qq(TeslaPowerwall2AC \(${new}\) - change password hash after rename successfully)
         if ( defined($passResp)
         and !defined($passErr) );
 
