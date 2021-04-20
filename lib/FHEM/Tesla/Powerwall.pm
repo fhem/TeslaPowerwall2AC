@@ -234,7 +234,7 @@ sub Undef {
 
 sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
-    my $hash = $$::defs{$name};
+    my $hash = $::defs{$name};
 
     if ( $attrName eq 'disable' ) {
         if ( $cmd eq 'set' && $attrVal eq '1' ) {
