@@ -207,12 +207,12 @@ qq(TeslaPowerwall2AC \(${name}\) - defined TeslaPowerwall2AC Device with Host ${
         ($passResp,$passErr) = $hash->{helper}->{passObj}->setStorePassword($name,ReadPassword( $hash, $name ));
         
         ::Log3($name, 1,
-qq(TeslaPowerwall2AC \(${name}\) - error while saving the password - $passErr)
+qq(TeslaPowerwall2AC \(${name}\) - error while saving the password - $passErr))
           if ( !defined($passResp)
            and defined($passErr) );
 
         ::Log3($name, 1,
-qq(TeslaPowerwall2AC \(${name}\) - password successfully saved)
+qq(TeslaPowerwall2AC \(${name}\) - password successfully saved))
           if ( defined($passResp)
            and !defined($passErr) );
            
@@ -436,7 +436,7 @@ sub Set {
 
         $list .= 'powerwalls:run,stop'
           if ( ::AttrVal( $name, 'devel', 0 ) == 1
-            exists($hash->{helper}->{passObj})
+            && exists($hash->{helper}->{passObj})
             && exists($hash->{helper}->{passObj})
             && defined($hash->{helper}->{passObj}->getReadPassword($name))
             && defined($hash->{TOKEN}) );
