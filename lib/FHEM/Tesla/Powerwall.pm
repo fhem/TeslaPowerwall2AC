@@ -58,7 +58,7 @@ use strict;
 use warnings;
 use GPUtils qw(GP_Export);
 use HttpUtils;
-use FHEM::Core::Password::Utils qw(:ALL);
+use FHEM::Core::Authentication::Passwords qw(:ALL);
 
 use Data::Dumper;
 
@@ -200,7 +200,7 @@ sub Define {
 qq(TeslaPowerwall2AC \(${name}\) - defined TeslaPowerwall2AC Device with Host ${host} and Interval $hash->{INTERVAL}));
 
     ### create password object to handle pass keystore
-    $hash->{helper}->{passObj}  = FHEM::Core::Password::Utils->new();
+    $hash->{helper}->{passObj}  = FHEM::Core::Authentication::Passwords->new();
     
     if ( defined( ReadPassword( $hash, $name ) ) ) {
         my ($passResp,$passErr);
