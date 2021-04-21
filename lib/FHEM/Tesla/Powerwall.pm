@@ -365,7 +365,8 @@ sub Get {
         $list .=
 'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg'
   if(  ::AttrVal($name,'emailaddr','none') ne 'none'
-    && defined(ReadPassword($hash, $name))
+    && exists($hash->{helper}->{passObj})
+    && defined($hash->{helper}->{passObj}->getReadPassword($name))
     && defined($hash->{TOKEN}) );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
@@ -406,11 +407,9 @@ sub Set {
           if ( !defined($passResp)
            and defined($passErr) );
 
-        return q{password successfully saved}
+        return Timer_GetData($hash)
           if ( defined($passResp)
            and !defined($passErr) );
-
-        return Timer_GetData($hash);
     }
     elsif ( lc $cmd eq 'removepassword' ) {
         return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
@@ -429,14 +428,12 @@ sub Set {
     else {
 
         my $list = ( exists($hash->{helper}->{passObj})
-            && exists($hash->{helper}->{passObj})
             && defined($hash->{helper}->{passObj}->getReadPassword($name))
           ? 'removePassword:noArg '
           : 'setPassword ');
 
         $list .= 'powerwalls:run,stop'
           if ( ::AttrVal( $name, 'devel', 0 ) == 1
-            && exists($hash->{helper}->{passObj})
             && exists($hash->{helper}->{passObj})
             && defined($hash->{helper}->{passObj}->getReadPassword($name))
             && defined($hash->{TOKEN}) );
