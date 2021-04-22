@@ -935,35 +935,6 @@ sub CreateUri {
     return ( $uri, $method, $header, $data, $path );
 }
 
-sub StorePassword {
-    my $hash     = shift;
-    my $name     = shift;
-    my $password = shift;
-
-    my $index   = $hash->{TYPE} . q{_} . $name . q{_passwd};
-    my $key     = ::getUniqueId() . $index;
-    my $enc_pwd = q{};
-
-    if ( eval qq(use Digest::MD5;1) ) {
-
-        $key = Digest::MD5::md5_hex( unpack "H*", $key );
-        $key .= Digest::MD5::md5_hex($key);
-    }
-
-    for my $char ( split //, $password ) {
-
-        my $encode = chop($key);
-        $enc_pwd .= sprintf( "%.2x", ord($char) ^ ord($encode) );
-        $key = $encode . $key;
-    }
-
-    my $err = ::setKeyValue( $index, $enc_pwd );
-    return qq(error while saving the password - ${err})
-      if ( defined($err) );
-
-    return q{password successfully saved};
-}
-
 sub ReadPassword {
     my $hash = shift;
     my $name = shift;
