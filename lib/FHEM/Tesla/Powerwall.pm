@@ -200,7 +200,7 @@ sub Define {
 qq(TeslaPowerwall2AC \(${name}\) - defined TeslaPowerwall2AC Device with Host ${host} and Interval $hash->{INTERVAL}));
 
     ### create password object to handle pass keystore
-    $hash->{helper}->{passObj}  = FHEM::Core::Authentication::Passwords->new();
+    $hash->{helper}->{passObj}  = FHEM::Core::Authentication::Passwords->new($hash->{TYPE});
     
     if ( defined( ReadPassword( $hash, $name ) ) ) {
         my ($passResp,$passErr);
