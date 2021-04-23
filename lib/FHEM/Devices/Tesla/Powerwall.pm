@@ -52,7 +52,7 @@
 ##
 ##
 
-package FHEM::Tesla::Powerwall;
+package FHEM::Devices::Tesla::Powerwall;
 
 use strict;
 use warnings;
@@ -464,7 +464,7 @@ sub Timer_GetData {
     }
 
     ::InternalTimer( ::gettimeofday() + $hash->{INTERVAL},
-        \&FHEM::Tesla::Powerwall::Timer_GetData, $hash );
+        \&FHEM::Devices::Tesla::Powerwall::Timer_GetData, $hash );
     ::Log3($name, 4,
       qq(TeslaPowerwall2AC ($name) - Call ::InternalTimer Timer_GetData));
 }
@@ -573,7 +573,7 @@ sub ErrorHandling {
     }
     #### End Error Handling
 
-    ::InternalTimer( ::gettimeofday() + 3, \&FHEM::Tesla::Powerwall::Write, $hash )
+    ::InternalTimer( ::gettimeofday() + 3, \&FHEM::Devices::Tesla::Powerwall::Write, $hash )
       if ( defined( $hash->{actionQueue} )
         && scalar( @{ $hash->{actionQueue} } ) > 0 );
 
