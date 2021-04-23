@@ -179,6 +179,8 @@ qq(TeslaPowerwall2AC ($name) - defined TeslaPowerwall2AC Device with Host $host 
     ### create password object to handle pass keystore
     $hash->{helper}->{passObj}  = FHEM::Core::Authentication::Passwords->new($hash->{TYPE});
     
+    
+    ## kann nach einiger Zeit gelöscht werden genauso wie auch ReadPassword und DeletePassword
     if ( defined( ReadPassword( $hash, $name ) ) ) {
         my ($passResp,$passErr);
         ($passResp,$passErr) = $hash->{helper}->{passObj}->setStorePassword($name,ReadPassword( $hash, $name ));
@@ -912,6 +914,7 @@ sub CreateUri {
     return ( $uri, $method, $header, $data, $path );
 }
 
+### Kann nach einiger Zeit entfernt werden
 sub ReadPassword {
     my $hash = shift;
     my $name = shift;
@@ -960,8 +963,7 @@ qq(TeslaPowerwall2AC ($name) - unable to read password from file: $err));
     return;
 }
 
-
-
+#### kann nach einiger Zeit gelöscht werden, entferne auch Code aus der Define Fn
 sub DeletePassword {
     my $hash    = shift;
 
