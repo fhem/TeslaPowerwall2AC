@@ -494,6 +494,7 @@ sub Write {
             header    => $header,
             hash      => $hash,
             setCmd    => $path,
+            sslargs => { SSL_hostname => 0, verify_hostname => 0, SSL_verify_mode => 0 },
             doTrigger => 1,
             callback  => \&ErrorHandling,
         }
