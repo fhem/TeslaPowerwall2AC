@@ -5,7 +5,7 @@ use POSIX qw(strftime);
 use strict;
 
 my @filenames = ( 'FHEM/46_TeslaPowerwall2AC.pm',
-                  'lib/FHEM/Tesla/Powerwall.pm'   
+                  'lib/FHEM/Devices/Tesla/Powerwall.pm'   
                 );
 
 my $controlsfile = 'controls_TeslaPowerwall2AC.txt';
