@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2017-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2016-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -56,10 +56,19 @@ package FHEM::Devices::Tesla::Powerwall;
 
 use strict;
 use warnings;
+
 use HttpUtils;
+use GPUtils qw(GP_Import);
 use FHEM::Core::Authentication::Passwords qw(:ALL);
 
-use Data::Dumper;
+BEGIN {
+    # Import from main context
+    GP_Import(
+        qw( init_done
+          defs
+          )
+    );
+}
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -67,15 +76,11 @@ eval {
     require JSON::MaybeXS;
     import JSON::MaybeXS qw( decode_json encode_json );
     1;
-};
-
-if ($@) {
-    $@ = undef;
+} or do {
 
     # try to use JSON wrapper
     #   for chance of better performance
     eval {
-
         # JSON preference order
         local $ENV{PERL_JSON_BACKEND} =
           'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
@@ -84,10 +89,7 @@ if ($@) {
         require JSON;
         import JSON qw( decode_json encode_json );
         1;
-    };
-
-    if ($@) {
-        $@ = undef;
+    } or do {
 
         # In rare cases, Cpanel::JSON::XS may
         #   be installed but JSON|JSON::MaybeXS not ...
@@ -95,10 +97,7 @@ if ($@) {
             require Cpanel::JSON::XS;
             import Cpanel::JSON::XS qw(decode_json encode_json);
             1;
-        };
-
-        if ($@) {
-            $@ = undef;
+        } or do {
 
             # In rare cases, JSON::XS may
             #   be installed but JSON not ...
@@ -106,10 +105,7 @@ if ($@) {
                 require JSON::XS;
                 import JSON::XS qw(decode_json encode_json);
                 1;
-            };
-
-            if ($@) {
-                $@ = undef;
+            } or do {
 
                 # Fallback to built-in JSON which SHOULD
                 #   be available since 5.014 ...
@@ -117,47 +113,46 @@ if ($@) {
                     require JSON::PP;
                     import JSON::PP qw(decode_json encode_json);
                     1;
-                };
-
-                if ($@) {
-                    $@ = undef;
+                } or do {
 
                     # Fallback to JSON::backportPP in really rare cases
                     require JSON::backportPP;
                     import JSON::backportPP qw(decode_json encode_json);
                     1;
-                }
-            }
-        }
-    }
-}
-
+                };
+            };
+        };
+    };
+};
 
 my %paths = (
-    'statussoe'         => 'system_status/soe',
-    'aggregates'        => 'meters/aggregates',
-    'meterssite'        => 'meters/site',
-    'meterssolar'       => 'meters/solar',
-    'siteinfo'          => 'site_info',
-    'sitename'          => 'site_info/site_name',
-    'sitemaster'        => 'sitemaster',
-    'powerwalls'        => 'powerwalls',
-    'registration'      => 'customer/registration',
-    'status'            => 'status',
-    'gridstatus'        => 'system_status/grid_status',
+    'statussoe'    => 'system_status/soe',
+    'aggregates'   => 'meters/aggregates',
+    'meterssite'   => 'meters/site',
+    'meterssolar'  => 'meters/solar',
+    'siteinfo'     => 'site_info',
+    'sitename'     => 'site_info/site_name',
+    'sitemaster'   => 'sitemaster',
+    'powerwalls'   => 'powerwalls',
+    'registration' => 'customer/registration',
+    'status'       => 'status',
+    'gridstatus'   => 'system_status/grid_status',
 );
 
 my %cmdPaths = (
-    'powerwallsstop'    => 'sitemaster/stop',
-    'powerwallsrun'     => 'sitemaster/run',
+    'powerwallsstop' => 'sitemaster/stop',
+    'powerwallsrun'  => 'sitemaster/run',
 );
 
 sub Define {
     my $hash = shift;
-    my $aArg = shift;    
+    my $aArg = shift;
+    my $version;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
-    use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+
+    $version = FHEM::Meta::Get( $hash, 'version' );
+    our $VERSION = $version;
 
     return q{too few parameters: define <name> TeslaPowerwall2AC <HOST>}
       if ( scalar( @{$aArg} ) != 3 );
@@ -173,57 +168,40 @@ sub Define {
 
     ::CommandAttr( undef, $name . q{ room Tesla} )
       if ( ::AttrVal( $name, 'room', 'none' ) eq 'none' );
-    ::Log3($name, 3,
-qq(TeslaPowerwall2AC ($name) - defined TeslaPowerwall2AC Device with Host $host and Interval $hash->{INTERVAL}));
+    ::Log3( $name, 3,
+"TeslaPowerwall2AC ($name) - defined TeslaPowerwall2AC Device with Host $host and Interval $hash->{INTERVAL}"
+    );
 
     ### create password object to handle pass keystore
-    $hash->{helper}->{passObj}  = FHEM::Core::Authentication::Passwords->new($hash->{TYPE});
-    
-    
-    ## kann nach einiger Zeit gelöscht werden genauso wie auch ReadPassword und DeletePassword
-    if ( defined( ReadPassword( $hash, $name ) ) ) {
-        my ($passResp,$passErr);
-        ($passResp,$passErr) = $hash->{helper}->{passObj}->setStorePassword($name,ReadPassword( $hash, $name ));
-        
-        ::Log3($name, 1,
-qq(TeslaPowerwall2AC ($name) - error while saving the password - $passErr))
-          if ( !defined($passResp)
-           and defined($passErr) );
-
-        ::Log3($name, 1,
-qq(TeslaPowerwall2AC ($name) - password successfully saved))
-          if ( defined($passResp)
-           and !defined($passErr) );
-           
-        DeletePassword($hash);
-    }
+    $hash->{helper}->{passObj} =
+      FHEM::Core::Authentication::Passwords->new( $hash->{TYPE} );
 
     return;
 }
 
 sub Undef {
-    my $hash    = shift;
-    my $name    = shift;
+    my $hash = shift;
+    my $name = shift;
 
     ::RemoveInternalTimer($hash);
-    ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - Device $name deleted));
+    ::Log3( $name, 3, "TeslaPowerwall2AC ($name) - Device $name deleted" );
 
     return;
 }
 
 sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
-    my $hash = $::defs{$name};
+    my $hash = $defs{$name};
 
     if ( $attrName eq 'disable' ) {
         if ( $cmd eq 'set' && $attrVal eq '1' ) {
             ::RemoveInternalTimer($hash);
             ::readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
-            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - disabled));
+            ::Log3( $name, 3, "TeslaPowerwall2AC ($name) - disabled" );
 
         }
         elsif ( $cmd eq 'del' ) {
-            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - enabled));
+            ::Log3( $name, 3, "TeslaPowerwall2AC ($name) - enabled" );
         }
     }
 
@@ -231,13 +209,14 @@ sub Attr {
         if ( $cmd eq 'set' ) {
             return
 'check disabledForIntervals Syntax HH:MM-HH:MM or \'HH:MM-HH:MM HH:MM-HH:MM ...\''
-              unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
-            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - disabledForIntervals));
+              unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/x );
+            ::Log3( $name, 3,
+                "TeslaPowerwall2AC ($name) - disabledForIntervals" );
             ::readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
 
         }
         elsif ( $cmd eq 'del' ) {
-            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - enabled));
+            ::Log3( $name, 3, "TeslaPowerwall2AC ($name) - enabled" );
             ::readingsSingleUpdate( $hash, 'state', 'active', 1 );
         }
     }
@@ -245,8 +224,9 @@ sub Attr {
     if ( $attrName eq 'interval' ) {
         if ( $cmd eq 'set' ) {
             if ( $attrVal < 60 ) {
-                ::Log3($name, 3,
-qq(TeslaPowerwall2AC ($name) - interval too small, please use something >= 60 (sec), default is 300 (sec)));
+                ::Log3( $name, 3,
+"TeslaPowerwall2AC ($name) - interval too small, please use something >= 60 (sec), default is 300 (sec)"
+                );
                 return
 q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
 
@@ -254,16 +234,16 @@ q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
             else {
                 ::RemoveInternalTimer($hash);
                 $hash->{INTERVAL} = $attrVal;
-                ::Log3($name, 3,
-                  qq(TeslaPowerwall2AC ($name) - set interval to $attrVal));
+                ::Log3( $name, 3,
+                    "TeslaPowerwall2AC ($name) - set interval to $attrVal" );
                 Timer_GetData($hash);
             }
         }
         elsif ( $cmd eq 'del' ) {
             ::RemoveInternalTimer($hash);
             $hash->{INTERVAL} = 300;
-            ::Log3($name, 3,
-              qq(TeslaPowerwall2AC ($name) - set interval to default));
+            ::Log3( $name, 3,
+                "TeslaPowerwall2AC ($name) - set interval to default" );
             Timer_GetData($hash);
         }
     }
@@ -272,10 +252,10 @@ q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
 }
 
 sub Notify {
-    my $hash    = shift;
-    my $dev     = shift;
-    
-    my $name    = $hash->{NAME};
+    my $hash = shift;
+    my $dev  = shift;
+
+    my $name = $hash->{NAME};
     return if ( ::IsDisabled($name) );
 
     my $devname = $dev->{NAME};
@@ -285,12 +265,14 @@ sub Notify {
 
     Timer_GetData($hash)
       if (
-           ( grep /^INITIALIZED$/, @{$events}
-          or grep /^ATTR.$name.emailaddr$/, @{$events}
-          or grep /^DELETEATTR.$name.disable$/, @{$events}
-          or grep /^DELETEATTR.$name.interval$/, @{$events}
-          or grep /^DEFINED.$name$/, @{$events} )
-        and $::init_done
+        (
+               grep { /^INITIALIZED$/x } @{$events}
+            or grep { /^ATTR.$name.emailaddr$/x } @{$events}
+            or grep { /^DELETEATTR.$name.disable$/x } @{$events}
+            or grep { /^DELETEATTR.$name.interval$/x } @{$events}
+            or grep { /^DEFINED.$name$/x } @{$events}
+        )
+        && $init_done
       );
     return;
 }
@@ -343,10 +325,10 @@ sub Get {
         my $list = '';
         $list .=
 'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg'
-  if(  ::AttrVal($name,'emailaddr','none') ne 'none'
-    && exists($hash->{helper}->{passObj})
-    && defined($hash->{helper}->{passObj}->getReadPassword($name))
-    && defined($hash->{TOKEN}) );
+          if ( ::AttrVal( $name, 'emailaddr', 'none' ) ne 'none'
+            && exists( $hash->{helper}->{passObj} )
+            && defined( $hash->{helper}->{passObj}->getReadPassword($name) )
+            && defined( $hash->{TOKEN} ) );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
     }
@@ -361,7 +343,7 @@ sub Get {
     return;
 }
 
-sub Set {
+sub Set {    ## no critic (Subroutine with high complexity score)
     my $hash = shift;
     my $aArg = shift;
     my $hArg = shift;
@@ -370,52 +352,58 @@ sub Set {
     my $cmd  = shift @$aArg // return qq(set $name needs at least one argument);
     my $arg;
 
-
     if ( $cmd eq 'powerwalls' ) {
         $arg = lc( $cmd . $aArg->[0] );
     }
     elsif ( lc $cmd eq 'setpassword' ) {
         return q{please set Attribut emailaddr first}
           if ( ::AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
-        return qq(usage: $cmd pass=<password>) if ( scalar( @{$aArg} ) != 0
-                                                   || scalar(keys %{$hArg}) != 1 );
-        my ($passResp,$passErr);
-        ($passResp,$passErr) = $hash->{helper}->{passObj}->setStorePassword($name,$hArg->{'pass'});
-        
+
+        return qq(usage: $cmd pass=<password>)
+          if ( scalar( @{$aArg} ) != 0
+            || scalar( keys %{$hArg} ) != 1 );
+        my ( $passResp, $passErr );
+
+        ( $passResp, $passErr ) = $hash->{helper}->{passObj}
+          ->setStorePassword( $name, $hArg->{'pass'} );
+
         return qq{error while saving the password - $passErr}
-          if ( !defined($passResp)
-           and defined($passErr) );
+          if (!defined($passResp)
+            && defined($passErr) );
 
         return Timer_GetData($hash)
           if ( defined($passResp)
-           and !defined($passErr) );
+            && !defined($passErr) );
     }
     elsif ( lc $cmd eq 'removepassword' ) {
         return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
 
-        my ($passResp,$passErr);
-        ($passResp,$passErr) = $hash->{helper}->{passObj}->setDeletePassword($name);
-        
+        my ( $passResp, $passErr );
+        ( $passResp, $passErr ) =
+          $hash->{helper}->{passObj}->setDeletePassword($name);
+
         return qq{error while saving the password - $passErr}
-          if ( !defined($passResp)
-           and defined($passErr) );
+          if (!defined($passResp)
+            && defined($passErr) );
 
         return q{password successfully removed}
           if ( defined($passResp)
-           and !defined($passErr) );
+            && !defined($passErr) );
     }
     else {
 
-        my $list = ( exists($hash->{helper}->{passObj})
-            && defined($hash->{helper}->{passObj}->getReadPassword($name))
-          ? 'removePassword:noArg '
-          : 'setPassword ');
+        my $list = (
+            exists( $hash->{helper}->{passObj} )
+              && defined( $hash->{helper}->{passObj}->getReadPassword($name) )
+            ? 'removePassword:noArg '
+            : 'setPassword '
+        );
 
         $list .= 'powerwalls:run,stop'
           if ( ::AttrVal( $name, 'devel', 0 ) == 1
-            && exists($hash->{helper}->{passObj})
-            && defined($hash->{helper}->{passObj}->getReadPassword($name))
-            && defined($hash->{TOKEN}) );
+            && exists( $hash->{helper}->{passObj} )
+            && defined( $hash->{helper}->{passObj}->getReadPassword($name) )
+            && defined( $hash->{TOKEN} ) );
 
         return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
     }
@@ -433,21 +421,25 @@ sub Timer_GetData {
     ::RemoveInternalTimer($hash);
 
     if ( defined( $hash->{actionQueue} )
-      && scalar( @{ $hash->{actionQueue} } ) == 0 )
+        && scalar( @{ $hash->{actionQueue} } ) == 0 )
     {
         if ( !::IsDisabled($name) ) {
             return ::readingsSingleUpdate( $hash, 'state',
-              'please set Attribut emailaddr first', 1 )
-                if ( ::AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
+                'please set Attribut emailaddr first', 1 )
+              if ( ::AttrVal( $name, 'emailaddr', 'none' ) eq 'none' );
             return ::readingsSingleUpdate( $hash, 'state',
-              'please set password first', 1 )
-                if (   !exists($hash->{helper}->{passObj})
-                  || ( exists($hash->{helper}->{passObj})
-                    && !defined($hash->{helper}->{passObj}->getReadPassword($name))
-                  )
-                );
-        
-            if ( !defined( $hash->{TOKEN}) ) {
+                'please set password first', 1 )
+              if (
+                !exists( $hash->{helper}->{passObj} )
+                || (
+                    exists( $hash->{helper}->{passObj} )
+                    && !defined(
+                        $hash->{helper}->{passObj}->getReadPassword($name)
+                    )
+                )
+              );
+
+            if ( !defined( $hash->{TOKEN} ) ) {
                 unshift( @{ $hash->{actionQueue} }, 'login' );
             }
             else {
@@ -465,8 +457,11 @@ sub Timer_GetData {
 
     ::InternalTimer( ::gettimeofday() + $hash->{INTERVAL},
         \&FHEM::Devices::Tesla::Powerwall::Timer_GetData, $hash );
-    ::Log3($name, 4,
-      qq(TeslaPowerwall2AC ($name) - Call ::InternalTimer Timer_GetData));
+
+    ::Log3( $name, 4,
+        "TeslaPowerwall2AC ($name) - Call ::InternalTimer Timer_GetData" );
+
+    return;
 }
 
 sub Write {
@@ -487,29 +482,31 @@ sub Write {
 
     ::HttpUtils_NonblockingGet(
         {
-            url       => 'https://' . $uri,
-            timeout   => 5,
-            method    => $method,
-            data      => $data,
-            header    => $header,
-            hash      => $hash,
-            setCmd    => $path,
-            sslargs => { SSL_hostname => 0, verify_hostname => 0, SSL_verify_mode => 0 },
+            url     => 'https://' . $uri,
+            timeout => 5,
+            method  => $method,
+            data    => $data,
+            header  => $header,
+            hash    => $hash,
+            setCmd  => $path,
+            sslargs =>
+              { SSL_hostname => 0, verify_hostname => 0, SSL_verify_mode => 0 },
             doTrigger => 1,
             callback  => \&ErrorHandling,
         }
     );
 
-    ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - Send with URI: https://$uri));
+    return ::Log3( $name, 4,
+        "TeslaPowerwall2AC ($name) - Send with URI: https://$uri" );
 }
 
 sub ErrorHandling {
-    my $param   = shift;
-    my $err     = shift;
-    my $data    = shift;
-    
-    my $hash    = $param->{hash};
-    my $name    = $hash->{NAME};
+    my $param = shift;
+    my $err   = shift;
+    my $data  = shift;
+
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
 
     ### Begin Error Handling
 
@@ -521,16 +518,17 @@ sub ErrorHandling {
             ::readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
             ::readingsEndUpdate( $hash, 1 );
 
-            ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - RequestERROR: $err));
+            ::Log3( $name, 3,
+                "TeslaPowerwall2AC ($name) - RequestERROR: $err" );
 
             $hash->{actionQueue} = [];
             return;
         }
     }
 
-    if ( $data eq ''
-      && exists($param->{code})
-      && $param->{code} != 200 )
+    if (   $data eq ''
+        && exists( $param->{code} )
+        && $param->{code} != 200 )
     {
 
         ::readingsBeginUpdate($hash);
@@ -538,21 +536,20 @@ sub ErrorHandling {
 
         ::readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
 
-        ::Log3($name, 3,
-          qq(TeslaPowerwall2AC ($name) - RequestERROR: " . $param->{code}));
+        ::Log3( $name, 3,
+            "TeslaPowerwall2AC ($name) - RequestERROR: $param->{code}" );
 
         ::readingsEndUpdate( $hash, 1 );
 
-        ::Log3($name, 5,
-            qq(TeslaPowerwall2AC ($name) - RequestERROR: received http code "
-          . $param->{code}
-          . " without any data after requesting));
+        ::Log3( $name, 5,
+"TeslaPowerwall2AC ($name) - RequestERROR: received http code $param->{code} without any data after requesting"
+        );
 
         $hash->{actionQueue} = [];
         return;
     }
 
-    if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$# ) {
+    if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$#xms ) {
 
         ::readingsBeginUpdate($hash);
 
@@ -572,29 +569,31 @@ sub ErrorHandling {
 
         ::readingsEndUpdate( $hash, 1 );
     }
-    #### End Error Handling
+    ### End Error Handling
 
-    ::InternalTimer( ::gettimeofday() + 3, \&FHEM::Devices::Tesla::Powerwall::Write, $hash )
+    ::InternalTimer( ::gettimeofday() + 3,
+        \&FHEM::Devices::Tesla::Powerwall::Write, $hash )
       if ( defined( $hash->{actionQueue} )
         && scalar( @{ $hash->{actionQueue} } ) > 0 );
 
-    ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - Recieve JSON data: $data));
+    ::Log3( $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data" );
 
-    ResponseProcessing( $hash, $param->{setCmd}, $data );
+    return ResponseProcessing( $hash, $param->{setCmd}, $data );
 }
 
 sub ResponseProcessing {
-    my $hash    = shift;
-    my $path    = shift;
-    my $json    = shift;
+    my $hash = shift;
+    my $path = shift;
+    my $json = shift;
 
-    my $name    = $hash->{NAME};
+    my $name = $hash->{NAME};
     my $decode_json;
     my $readings;
 
     $decode_json = eval { decode_json($json) };
     if ($@) {
-        ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - error while request: $@));
+        ::Log3( $name, 4,
+            "TeslaPowerwall2AC ($name) - error while request: $@" );
         ::readingsBeginUpdate($hash);
         ::readingsBulkUpdate( $hash, 'JSON Error', $@ );
         ::readingsBulkUpdate( $hash, 'state',      'JSON error' );
@@ -604,9 +603,9 @@ sub ResponseProcessing {
 
     return
       if ( ref($decode_json) eq 'HASH'
-        && defined($decode_json->{error})
+        && defined( $decode_json->{error} )
         && $decode_json->{error}
-        && defined($decode_json->{code})
+        && defined( $decode_json->{code} )
         && $decode_json->{code} );
 
     #### Verarbeitung der Readings zum passenden Path
@@ -631,17 +630,17 @@ sub ResponseProcessing {
         $readings = $decode_json;
     }
 
-    WriteReadings( $hash, $path, $readings );
+    return WriteReadings( $hash, $path, $readings );
 }
 
 sub WriteReadings {
-    my $hash        = shift;
-    my $path        = shift;
-    my $readings    = shift;
+    my $hash     = shift;
+    my $path     = shift;
+    my $readings = shift;
 
-    my $name        = $hash->{NAME};
+    my $name = $hash->{NAME};
 
-    ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - Write Readings));
+    ::Log3( $name, 4, "TeslaPowerwall2AC ($name) - Write Readings" );
 
     ::readingsBeginUpdate($hash);
     while ( my ( $r, $v ) = each %{$readings} ) {
@@ -657,8 +656,8 @@ sub WriteReadings {
         sprintf(
             "%.1f",
             (
-                ::ReadingsVal( $name, 'siteinfo-nominal_system_energy_kWh', 0 ) /
-                  100
+                ::ReadingsVal( $name, 'siteinfo-nominal_system_energy_kWh', 0 )
+                  / 100
             ) * ::ReadingsVal( $name, 'statussoe-percentage', 0 )
         )
     );
@@ -678,13 +677,15 @@ sub WriteReadings {
     );
 
     ::readingsEndUpdate( $hash, 1 );
+
+    return;
 }
 
 sub ReadingsProcessing_Aggregates {
     my $hash        = shift;
     my $decode_json = shift;
-    
-    my $name        = $hash->{NAME};
+
+    my $name = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
@@ -704,47 +705,50 @@ sub ReadingsProcessing_Aggregates {
 sub ReadingsProcessing_Powerwalls {
     my $hash        = shift;
     my $decode_json = shift;
-    
-    my $name        = $hash->{NAME};
+
+    my $name = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
-        for (keys %{$decode_json}) {
+        for ( keys %{$decode_json} ) {
             $readings{$_} = $decode_json->{$_}
-            if ( ref($decode_json->{$_}) ne 'ARRAY'
-              && defined($decode_json->{$_}) );
-                
-            if ( ref($decode_json->{$_}) eq 'ARRAY' ) {
-                my $i = 0;
+              if ( ref( $decode_json->{$_} ) ne 'ARRAY'
+                && defined( $decode_json->{$_} ) );
+
+            if ( ref( $decode_json->{$_} ) eq 'ARRAY' ) {
+                my $i  = 0;
                 my $r1 = $_;
-                for my $hRef (@{$decode_json->{$_}}) {
-                    for (keys %{$hRef}) {
-                        $r1 =~ s/s$//g;
+                my $hRef;
+                for my $hRef ( @{ $decode_json->{$_} } ) {
+                    for ( keys %{$hRef} ) {
+                        $r1 =~ s/s$//xg;
                         $readings{qq(${r1}_${i}_${_})} = $hRef->{$_}
-                        if ( ref($hRef->{$_}) ne 'ARRAY'
-                          && ref($hRef->{$_}) ne 'HASH'
-                          && defined($hRef->{$_}) );
-                            
-                        if ( ref($hRef->{$_}) eq 'HASH' ) {
+                          if ( ref( $hRef->{$_} ) ne 'ARRAY'
+                            && ref( $hRef->{$_} ) ne 'HASH'
+                            && defined( $hRef->{$_} ) );
+
+                        if ( ref( $hRef->{$_} ) eq 'HASH' ) {
                             my $r2 = $_;
                             my $r3 = $hRef->{$_};
-                            for (keys %{$r3}) {
+                            for ( keys %{$r3} ) {
                                 $readings{qq(${r1}_${i}_${r2}_${_})} = $r3->{$_}
-                                if ( ref($r3->{$_}) ne 'ARRAY'
-                                  && defined($r3->{$_}) );
+                                  if ( ref( $r3->{$_} ) ne 'ARRAY'
+                                    && defined( $r3->{$_} ) );
 
-                                if ( ref($r3->{$_}) eq 'ARRAY' ) {
+                                if ( ref( $r3->{$_} ) eq 'ARRAY' ) {
                                     my $ii = 0;
                                     my $r4 = $_;
-                                    for $hRef (@{$r3->{$_}}) {
-                                        for (keys %{$hRef}) {
-                                            $r4 =~ s/s$//g;
-                                            $readings{qq(${r1}_${i}_${r2}_${r4}_${ii}_${_})} = $hRef->{$_}
-                                            if ( ref($hRef->{$_}) ne 'HASH'
-                                              && defined($hRef->{$_}) );
+                                    for $hRef ( @{ $r3->{$_} } ) {
+                                        for ( keys %{$hRef} ) {
+                                            $r4 =~ s/s$//xg;
+                                            $readings{
+qq(${r1}_${i}_${r2}_${r4}_${ii}_${_})
+                                            } = $hRef->{$_}
+                                              if ( ref( $hRef->{$_} ) ne 'HASH'
+                                                && defined( $hRef->{$_} ) );
                                         }
 
-                                        $ii++
+                                        $ii++;
                                     }
                                 }
                             }
@@ -769,7 +773,7 @@ sub ReadingsProcessing_Site_Info {
     my $hash        = shift;
     my $decode_json = shift;
 
-    my $name        = $hash->{NAME};
+    my $name = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
@@ -789,12 +793,12 @@ sub ReadingsProcessing_Site_Info {
 sub ReadingsProcessing_Meters_Site {
     my $hash        = shift;
     my $decode_json = shift;
-    
-    my $name        = $hash->{NAME};
+
+    my $name = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'ARRAY'
-      && scalar( @{$decode_json} ) > 0 )
+        && scalar( @{$decode_json} ) > 0 )
     {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
@@ -839,11 +843,11 @@ sub ReadingsProcessing_Meters_Solar {
     my $hash        = shift;
     my $decode_json = shift;
 
-    my $name        = $hash->{NAME};
+    my $name = $hash->{NAME};
     my %readings;
 
     if ( ref($decode_json) eq 'ARRAY'
-      && scalar( @{$decode_json} ) > 0 )
+        && scalar( @{$decode_json} ) > 0 )
     {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
@@ -885,115 +889,66 @@ sub ReadingsProcessing_Meters_Solar {
 }
 
 sub CreateUri {
-    my $hash        = shift;
-    my $path        = shift;
+    my $hash = shift;
+    my $path = shift;
 
-    my $name        = $hash->{NAME};
-    my $host        = $hash->{HOST};
-    my $header      = ( defined($hash->{TOKEN}) ? 'Cookie: AuthCookie=' . $hash->{TOKEN} : undef );
-    my $method      = 'GET';
-    my $uri         = ( $path ne 'login' ? $host . '/api/' . $paths{$path} : $host . '/api/login/Basic' );
+    my $name   = $hash->{NAME};
+    my $host   = $hash->{HOST};
+    my $header = (
+        defined( $hash->{TOKEN} )
+        ? 'Cookie: AuthCookie=' . $hash->{TOKEN}
+        : undef
+    );
+    my $method = 'GET';
+    my $uri    = (
+          $path ne 'login'
+        ? $host . '/api/' . $paths{$path}
+        : $host . '/api/login/Basic'
+    );
     my $data;
 
-
     if ( $path eq 'login' ) {
-        $method     = 'POST';
-        $header     = 'Content-Type: application/json';
-        $data       = 
-              '{"username":"customer","password":"'
-            . $hash->{helper}->{passObj}->getReadPassword($name)
-            . '","email":"'
-            . ::AttrVal($name,'emailaddr','test@test.de')
-            . '","force_sm_off":false}'
+        $method = 'POST';
+        $header = 'Content-Type: application/json';
+        $data =
+            '{"username":"customer","password":"'
+          . $hash->{helper}->{passObj}->getReadPassword($name)
+          . '","email":"'
+          . ::AttrVal( $name, 'emailaddr', 'test@test.de' )
+          . '","force_sm_off":false}';
     }
-    elsif ( $path eq 'powerwallsstop'
-         || $path eq 'powerwallsruns' )
+    elsif ($path eq 'powerwallsstop'
+        || $path eq 'powerwallsruns' )
     {
-        $uri        = $host . '/api/' . $cmdPaths{$path};
+        $uri = $host . '/api/' . $cmdPaths{$path};
     }
 
     return ( $uri, $method, $header, $data, $path );
 }
 
-### Kann nach einiger Zeit entfernt werden
-sub ReadPassword {
-    my $hash = shift;
-    my $name = shift;
-
-    my $index = $hash->{TYPE} . q{_} . $name . q{_passwd};
-    my $key   = ::getUniqueId() . $index;
-    my ( $password, $err );
-
-    ::Log3($name, 4, qq(TeslaPowerwall2AC ($name) - Read password from file));
-
-    ( $err, $password ) = ::getKeyValue($index);
-
-    if ( defined($err) ) {
-
-        ::Log3($name, 3,
-qq(TeslaPowerwall2AC ($name) - unable to read password from file: $err));
-        return;
-
-    }
-
-    if ( defined($password) ) {
-        if ( eval qq(use Digest::MD5;1) ) {
-
-            $key = Digest::MD5::md5_hex( unpack "H*", $key );
-            $key .= Digest::MD5::md5_hex($key);
-        }
-
-        my $dec_pwd = '';
-
-        for my $char ( map { pack( 'C', hex($_) ) } ( $password =~ /(..)/g ) ) {
-
-            my $decode = chop($key);
-            $dec_pwd .= chr( ord($char) ^ ord($decode) );
-            $key = $decode . $key;
-        }
-
-        return $dec_pwd;
-
-    }
-    else {
-
-        ::Log3($name, 3, qq(TeslaPowerwall2AC ($name) - No password in file));
-        return;
-    }
-
-    return;
-}
-
-#### kann nach einiger Zeit gelöscht werden, entferne auch Code aus der Define Fn
-sub DeletePassword {
-    my $hash    = shift;
-
-    ::setKeyValue( $hash->{TYPE} . q(_) . $hash->{NAME} . q(_passwd), undef );
-
-    return;
-}
-
 sub Rename {
-    my $new     = shift;
-    my $old     = shift;
-    
-    my $hash    = $::defs{$new};
+    my $new = shift;
+    my $old = shift;
 
-    my ($passResp,$passErr);
-    ($passResp,$passErr) = $hash->{helper}->{passObj}->setRename($new,$old);
-    
-    ::Log3($new, 1,
-qq(TeslaPowerwall2AC ($new) - error while change the password hash after rename - $passErr))
-        if ( !defined($passResp)
-        and defined($passErr) );
+    my $hash = $defs{$new};
 
-    ::Log3($new, 1,
-qq(TeslaPowerwall2AC ($new) - change password hash after rename successfully))
-        if ( defined($passResp)
-        and !defined($passErr) );
+    my ( $passResp, $passErr );
+    ( $passResp, $passErr ) =
+      $hash->{helper}->{passObj}->setRename( $new, $old );
+
+    ::Log3( $new, 1,
+"TeslaPowerwall2AC ($new) - error while change the password hash after rename - $passErr"
+      )
+      if (!defined($passResp)
+        && defined($passErr) );
+
+    ::Log3( $new, 1,
+"TeslaPowerwall2AC ($new) - change password hash after rename successfully"
+      )
+      if ( defined($passResp)
+        && !defined($passErr) );
 
     return;
 }
-
 
 1;

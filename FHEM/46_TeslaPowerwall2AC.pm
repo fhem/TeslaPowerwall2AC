@@ -1,8 +1,8 @@
 ###############################################################################
 #
-# Developed with Kate
+# Developed with VSCodium and richterger perl plugin.
 #
-#  (c) 2017-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2017-2022 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -56,48 +56,45 @@ package FHEM::TeslaPowerwall2AC;
 
 use strict;
 use warnings;
-use FHEM::Meta;
-use GPUtils qw(GP_Export);
 
+use FHEM::Meta;
 require FHEM::Devices::Tesla::Powerwall;
+
+use GPUtils qw(GP_Import);
 
 #-- Run before package compilation
 BEGIN {
-
     #-- Export to main context with different name
-    GP_Export(
-        qw(
-            Initialize
-          )
-    );
+    GP_Import(qw( readingFnAttributes ));
 }
+
+sub ::TeslaPowerwall2AC_Initialize { goto &Initialize }
 
 sub Initialize {
 
-    my $hash            = shift;
+    my $hash = shift;
 
-    $hash->{GetFn}          = \&FHEM::Devices::Tesla::Powerwall::Get;
-    $hash->{SetFn}          = \&FHEM::Devices::Tesla::Powerwall::Set;
-    $hash->{DefFn}          = \&FHEM::Devices::Tesla::Powerwall::Define;
-    $hash->{UndefFn}        = \&FHEM::Devices::Tesla::Powerwall::Undef;
-    $hash->{NotifyFn}       = \&FHEM::Devices::Tesla::Powerwall::Notify;
-    $hash->{RenameFn}       = \&FHEM::Devices::Tesla::Powerwall::Rename;
+    $hash->{GetFn}    = \&FHEM::Devices::Tesla::Powerwall::Get;
+    $hash->{SetFn}    = \&FHEM::Devices::Tesla::Powerwall::Set;
+    $hash->{DefFn}    = \&FHEM::Devices::Tesla::Powerwall::Define;
+    $hash->{UndefFn}  = \&FHEM::Devices::Tesla::Powerwall::Undef;
+    $hash->{NotifyFn} = \&FHEM::Devices::Tesla::Powerwall::Notify;
+    $hash->{RenameFn} = \&FHEM::Devices::Tesla::Powerwall::Rename;
 
-    $hash->{AttrFn}         = \&FHEM::Devices::Tesla::Powerwall::Attr;
-    $hash->{AttrList}       =
-                      'interval '
-                    . 'disable:1 '
-                    . 'devel:1 '
-                    . 'emailaddr '
-                    . $::readingFnAttributes;
+    $hash->{AttrFn} = \&FHEM::Devices::Tesla::Powerwall::Attr;
+    $hash->{AttrList} =
+        'interval '
+      . 'disable:1 '
+      . 'devel:1 '
+      . 'emailaddr '
+      . $readingFnAttributes;
 
-    $hash->{parseParams}    = 1;
+    $hash->{parseParams} = 1;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 1;
-
 
 =pod
 
@@ -199,9 +196,9 @@ sub Initialize {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.0.0",
+  "version": "v2.0.1",
   "author": [
-    "Marko Oldenburg <leongaultier@gmail.com>"
+    "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
   "x_fhem_maintainer": [
     "CoolTux"
