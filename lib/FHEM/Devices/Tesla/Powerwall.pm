@@ -56,6 +56,7 @@ package FHEM::Devices::Tesla::Powerwall;
 
 use strict;
 use warnings;
+use experimental qw( switch );
 
 use HttpUtils;
 use GPUtils qw(GP_Import);
@@ -285,52 +286,27 @@ sub Get {
     my $cmd  = shift @$aArg // return qq(get $name needs at least one argument);
     my $arg;
 
-    if ( $cmd eq 'statusSOE' ) {
+    $cmd = lc($cmd);
 
-        $arg = lc($cmd);
-
-    }
-    elsif ( $cmd eq 'aggregates' ) {
-
-        $arg = lc($cmd);
-
-    }
-    elsif ( $cmd eq 'siteinfo' ) {
-
-        $arg = lc($cmd);
-
-    }
-    elsif ( $cmd eq 'powerwalls' ) {
-
-        $arg = lc($cmd);
-
-    }
-    elsif ( $cmd eq 'sitemaster' ) {
-
-        $arg = lc($cmd);
-
-    }
-    elsif ( $cmd eq 'registration' ) {
-
-        $arg = lc($cmd);
-
-    }
-    elsif ( $cmd eq 'status' ) {
-
-        $arg = lc($cmd);
-
-    }
-    else {
-
-        my $list = '';
-        $list .=
+    given ($cmd) {
+        when ('statussoe')    { $arg = $cmd; }
+        when ('aggregates')   { $arg = $cmd; }
+        when ('siteinfo')     { $arg = $cmd; }
+        when ('powerwalls')   { $arg = $cmd; }
+        when ('sitemaster')   { $arg = $cmd; }
+        when ('registration') { $arg = $cmd; }
+        when ('status')       { $arg = $cmd; }
+        default {
+            my $list = '';
+            $list .=
 'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg'
-          if ( ::AttrVal( $name, 'emailaddr', 'none' ) ne 'none'
-            && exists( $hash->{helper}->{passObj} )
-            && defined( $hash->{helper}->{passObj}->getReadPassword($name) )
-            && defined( $hash->{TOKEN} ) );
+              if ( ::AttrVal( $name, 'emailaddr', 'none' ) ne 'none'
+                && exists( $hash->{helper}->{passObj} )
+                && defined( $hash->{helper}->{passObj}->getReadPassword($name) )
+                && defined( $hash->{TOKEN} ) );
 
-        return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
+            return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
+        }
     }
 
     return 'There are still path commands in the action queue'
