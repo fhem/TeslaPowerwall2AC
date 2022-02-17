@@ -409,7 +409,7 @@ sub Timer_GetData {
                 !exists( $hash->{helper}->{passObj} )
                 || (
                     exists( $hash->{helper}->{passObj} )
-                    && !exists(
+                    && !defined(
                         $hash->{helper}->{passObj}->getReadPassword($name)
                     )
                 )
