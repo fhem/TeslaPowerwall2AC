@@ -396,7 +396,7 @@ sub Timer_GetData {
 
     ::RemoveInternalTimer($hash);
 
-    if ( defined( $hash->{actionQueue} )
+    if ( exists( $hash->{actionQueue} )
         && scalar( @{ $hash->{actionQueue} } ) == 0 )
     {
         if ( !::IsDisabled($name) ) {
@@ -409,13 +409,13 @@ sub Timer_GetData {
                 !exists( $hash->{helper}->{passObj} )
                 || (
                     exists( $hash->{helper}->{passObj} )
-                    && !defined(
+                    && !exists(
                         $hash->{helper}->{passObj}->getReadPassword($name)
                     )
                 )
               );
 
-            if ( !defined( $hash->{TOKEN} ) ) {
+            if ( !exists( $hash->{TOKEN} ) ) {
                 unshift @{ $hash->{actionQueue} }, 'login';
             }
             else {
@@ -535,8 +535,16 @@ sub ErrorHandling {
         {
             $hash->{helper}->{loginerr} = 1;
             $hash->{actionQueue} = [];
-
+            delete $hash->{TOKEN};
             unshift @{ $hash->{actionQueue} }, 'login';
+
+            ::Log3 $name, 1,
+              "TeslaPowerwall2AC ($name) - Login Error. Empty action queue";
+            ::Log3 $name, 1,
+              "TeslaPowerwall2AC ($name) - Login Error. run relogin";
+            ::Log3 $name, 1,
+              "TeslaPowerwall2AC ($name) - Login Error. New action queue "
+              . join ',', @{ $hash->{actionQueue} };
 
             return Write($hash);
         }
