@@ -161,12 +161,11 @@ sub Define {
     my $name = $aArg->[0];
     my $host = $aArg->[2];
 
-    $hash->{HOST}               = $host;
-    $hash->{INTERVAL}           = 300;
-    $hash->{VERSION}            = version->parse($VERSION)->normal;
-    $hash->{NOTIFYDEV}          = qq(global,$name);
-    $hash->{actionQueue}        = [];
-    $hash->{helper}->{loginerr} = 0;
+    $hash->{HOST}        = $host;
+    $hash->{INTERVAL}    = 300;
+    $hash->{VERSION}     = version->parse($VERSION)->normal;
+    $hash->{NOTIFYDEV}   = qq(global,$name);
+    $hash->{actionQueue} = [];
 
     ::CommandAttr( undef, $name . q{ room Tesla} )
       if ( ::AttrVal( $name, 'room', 'none' ) eq 'none' );
@@ -305,8 +304,6 @@ sub Get {
 
             return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
         }
-
-        $hash->{helper}->{loginerr} = 0 if $cmd eq 'login';
     }
 
     return 'There are still path commands in the action queue'
@@ -524,32 +521,28 @@ sub ErrorHandling {
     }
 
     ## Fehler für neuen Token
-    ## {"code":401,"error":"bad credentials","message":"Login Error"}
+    ## {"code":401,"error":"User session not found from HEZwKy9lY17-gLagEdpyzk3IsJgUvrE1jTP_SBDTyDQ2PPU--A8kF_p2tRmBQRLVKYzR11ijhO0j6kOXFzmxcw==","message":"Invalid bearer token"}
 
-    if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}$#xms ) {
+    if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}\z#xms ) {
 
         if (   $1 == 401
-            && $2 eq 'bad credentials'
-            && $3 eq 'Login Error'
-            && $hash->{helper}->{loginerr} == 0 )
+            && $2 =~ m#\AUser\ssession\snot\sfound\sfrom\s.*#xms
+            && $3 eq 'Invalid bearer token' )
         {
-            $hash->{helper}->{loginerr} = 1;
             $hash->{actionQueue} = [];
             delete $hash->{TOKEN};
             unshift @{ $hash->{actionQueue} }, 'login';
 
             ::Log3 $name, 1,
-              "TeslaPowerwall2AC ($name) - Login Error. Empty action queue";
+"TeslaPowerwall2AC ($name) - Invalid bearer token. Empty action queue";
             ::Log3 $name, 1,
-              "TeslaPowerwall2AC ($name) - Login Error. run relogin";
+              "TeslaPowerwall2AC ($name) - Invalid bearer token. run relogin";
             ::Log3 $name, 1,
-              "TeslaPowerwall2AC ($name) - Login Error. New action queue "
+"TeslaPowerwall2AC ($name) - Invalid bearer token. New action queue "
               . join ',', @{ $hash->{actionQueue} };
 
             return Write($hash);
         }
-
-        $hash->{helper}->{loginerr} = 0;
 
         ::readingsBeginUpdate($hash);
 

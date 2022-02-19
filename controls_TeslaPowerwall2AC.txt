@@ -1,2 +1,2 @@
 UPD 2022-01-29_04:24:06 6874 FHEM/46_TeslaPowerwall2AC.pm
-UPD 2022-02-17_08:35:26 28294 lib/FHEM/Devices/Tesla/Powerwall.pm
+UPD 2022-02-19_20:54:38 28171 lib/FHEM/Devices/Tesla/Powerwall.pm
