@@ -521,7 +521,7 @@ sub ErrorHandling {
     }
 
     ## Fehler für neuen Token
-    ## {"code":401,"error":"User session not found from HEZwKy9lY17-gLagEdpyzk3IsJgUvrE1jTP_SBDTyDQ2PPU--A8kF_p2tRmBQRLVKYzR11ijhO0j6kOXFzmxcw==","message":"Invalid bearer token"}
+    ## {"code":401,"error":"User session not found from HEZwKy9lY17-gLagEdpyzk3IsJgUvrE1XFzmxcw==","message":"Invalid bearer token"}
 
     if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}\z#xms ) {
 
@@ -712,35 +712,39 @@ sub ReadingsProcessing_Powerwalls {
                 my $r1 = $_;
                 my $hRef;
                 for my $hRef ( @{ $decode_json->{$_} } ) {
-                    for ( keys %{$hRef} ) {
-                        $r1 =~ s/s$//xg;
-                        $readings{qq(${r1}_${i}_${_})} = $hRef->{$_}
-                          if ( ref( $hRef->{$_} ) ne 'ARRAY'
-                            && ref( $hRef->{$_} ) ne 'HASH'
-                            && defined( $hRef->{$_} ) );
+                    if ( ref($hRef) eq 'HASH' ) {
+                        for ( keys %{$hRef} ) {
+                            $r1 =~ s/s$//xg;
+                            $readings{qq(${r1}_${i}_${_})} = $hRef->{$_}
+                              if ( ref( $hRef->{$_} ) ne 'ARRAY'
+                                && ref( $hRef->{$_} ) ne 'HASH'
+                                && defined( $hRef->{$_} ) );
 
-                        if ( ref( $hRef->{$_} ) eq 'HASH' ) {
-                            my $r2 = $_;
-                            my $r3 = $hRef->{$_};
-                            for ( keys %{$r3} ) {
-                                $readings{qq(${r1}_${i}_${r2}_${_})} = $r3->{$_}
-                                  if ( ref( $r3->{$_} ) ne 'ARRAY'
-                                    && defined( $r3->{$_} ) );
+                            if ( ref( $hRef->{$_} ) eq 'HASH' ) {
+                                my $r2 = $_;
+                                my $r3 = $hRef->{$_};
+                                for ( keys %{$r3} ) {
+                                    $readings{qq(${r1}_${i}_${r2}_${_})} =
+                                      $r3->{$_}
+                                      if ( ref( $r3->{$_} ) ne 'ARRAY'
+                                        && defined( $r3->{$_} ) );
 
-                                if ( ref( $r3->{$_} ) eq 'ARRAY' ) {
-                                    my $ii = 0;
-                                    my $r4 = $_;
-                                    for $hRef ( @{ $r3->{$_} } ) {
-                                        for ( keys %{$hRef} ) {
-                                            $r4 =~ s/s$//xg;
-                                            $readings{
+                                    if ( ref( $r3->{$_} ) eq 'ARRAY' ) {
+                                        my $ii = 0;
+                                        my $r4 = $_;
+                                        for $hRef ( @{ $r3->{$_} } ) {
+                                            for ( keys %{$hRef} ) {
+                                                $r4 =~ s/s$//xg;
+                                                $readings{
 qq(${r1}_${i}_${r2}_${r4}_${ii}_${_})
-                                            } = $hRef->{$_}
-                                              if ( ref( $hRef->{$_} ) ne 'HASH'
-                                                && defined( $hRef->{$_} ) );
-                                        }
+                                                } = $hRef->{$_}
+                                                  if (
+                                                    ref( $hRef->{$_} ) ne 'HASH'
+                                                    && defined( $hRef->{$_} ) );
+                                            }
 
-                                        $ii++;
+                                            $ii++;
+                                        }
                                     }
                                 }
                             }
