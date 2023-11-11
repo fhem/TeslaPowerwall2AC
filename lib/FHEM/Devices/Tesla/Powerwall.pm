@@ -59,7 +59,7 @@ use warnings;
 use experimental qw( switch );
 
 use HttpUtils;
-use GPUtils qw(GP_Import);
+use GPUtils                               qw(GP_Import);
 use FHEM::Core::Authentication::Passwords qw(:ALL);
 
 BEGIN {
@@ -67,7 +67,7 @@ BEGIN {
     GP_Import(
         qw( init_done
           defs
-          )
+        )
     );
 }
 
