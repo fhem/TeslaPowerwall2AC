@@ -132,7 +132,6 @@ my %paths = (
     'meterssite'   => 'meters/site',
     'meterssolar'  => 'meters/solar',
     'siteinfo'     => 'site_info',
-    'sitename'     => 'site_info/site_name',
     'sitemaster'   => 'sitemaster',
     'powerwalls'   => 'powerwalls',
     'registration' => 'customer/registration',
@@ -143,6 +142,13 @@ my %paths = (
 my %cmdPaths = (
     'powerwallsstop' => 'sitemaster/stop',
     'powerwallsrun'  => 'sitemaster/run',
+);
+
+# Optional endpoints may disappear with newer Gateway firmware. A 404 on one
+# of these paths disables only the automatic polling for the current FHEM
+# runtime. Manual get commands remain available and a restart probes again.
+my %optionalPaths = (
+    'registration' => 1,
 );
 
 sub Define {
@@ -230,7 +236,10 @@ q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
 
             }
             else {
-                ::RemoveInternalTimer($hash);
+                ::RemoveInternalTimer(
+                    $hash,
+                    \&FHEM::Devices::Tesla::Powerwall::Timer_GetData
+                );
                 $hash->{INTERVAL} = $attrVal;
                 ::Log3 $name, 3,
                   "TeslaPowerwall2AC ($name) - set interval to $attrVal";
@@ -238,7 +247,10 @@ q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
             }
         }
         elsif ( $cmd eq 'del' ) {
-            ::RemoveInternalTimer($hash);
+            ::RemoveInternalTimer(
+                $hash,
+                \&FHEM::Devices::Tesla::Powerwall::Timer_GetData
+            );
             $hash->{INTERVAL} = 300;
             ::Log3 $name, 3,
               "TeslaPowerwall2AC ($name) - set interval to default";
@@ -391,10 +403,14 @@ sub Timer_GetData {
     my $hash = shift;
     my $name = $hash->{NAME};
 
-    ::RemoveInternalTimer($hash);
+    ::RemoveInternalTimer(
+        $hash,
+        \&FHEM::Devices::Tesla::Powerwall::Timer_GetData
+    );
 
     if ( exists( $hash->{actionQueue} )
-        && scalar( @{ $hash->{actionQueue} } ) == 0 )
+        && scalar( @{ $hash->{actionQueue} } ) == 0
+        && !$hash->{helper}->{requestInFlight} )
     {
         if ( !::IsDisabled($name) ) {
             return ::readingsSingleUpdate( $hash, 'state',
@@ -417,6 +433,11 @@ sub Timer_GetData {
             }
             else {
                 while ( my $obj = each %paths ) {
+                    next
+                      if ( exists( $optionalPaths{$obj} )
+                        && exists( $hash->{helper}->{unsupportedPaths} )
+                        && exists( $hash->{helper}->{unsupportedPaths}->{$obj} ) );
+
                     unshift @{ $hash->{actionQueue} }, $obj;
                 }
             }
@@ -441,10 +462,40 @@ sub Write {
     my $hash = shift;
     my $name = $hash->{NAME};
 
-    my ( $uri, $method, $header, $data, $path ) =
-      CreateUri( $hash, pop( @{ $hash->{actionQueue} } ) );
+    # Only one HTTP request may be active at a time. The current queue item is
+    # removed before HttpUtils calls us back, so an empty queue alone does not
+    # mean that the module is idle.
+    return
+      if ( $hash->{helper}->{requestInFlight} );
 
-    ::readingsSingleUpdate(
+    if ( !exists( $hash->{actionQueue} )
+        || scalar( @{ $hash->{actionQueue} } ) == 0 )
+    {
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdateIfChanged(
+            $hash, 'actionQueue', '0 entries in the Queue'
+        );
+        ::readingsBulkUpdateIfChanged( $hash, 'state', 'ready' );
+        ::readingsEndUpdate( $hash, 1 );
+
+        ::Log3 $name, 4,
+          "TeslaPowerwall2AC ($name) - Write called with empty actionQueue, ignoring";
+        return;
+    }
+
+    my $queueEntry = pop( @{ $hash->{actionQueue} } );
+    my ( $uri, $method, $header, $data, $path ) =
+      CreateUri( $hash, $queueEntry );
+
+    $hash->{helper}->{requestInFlight} = 1;
+
+    ::readingsBeginUpdate($hash);
+    ::readingsBulkUpdateIfChanged(
+        $hash,
+        'actionQueue',
+        scalar( @{ $hash->{actionQueue} } ) . ' entries in the Queue'
+    );
+    ::readingsBulkUpdate(
         $hash,
         'state',
         'fetch data - '
@@ -452,6 +503,7 @@ sub Write {
           . ' entries in the Queue',
         1
     );
+    ::readingsEndUpdate( $hash, 1 );
 
     ::HttpUtils_NonblockingGet(
         {
@@ -480,88 +532,209 @@ sub ErrorHandling {
 
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
+    my $path = $param->{setCmd};
+
+    # The callback marks completion of the one active HTTP request, regardless
+    # of whether it completed successfully or with an error.
+    $hash->{helper}->{requestInFlight} = 0;
+
+    my $httpCode =
+      ( exists( $param->{code} ) && defined( $param->{code} )
+        ? $param->{code}
+        : 0 );
 
     ### Begin Error Handling
 
-    if ( defined($err) ) {
-        if ( $err ne '' ) {
-
-            ::readingsBeginUpdate($hash);
-            ::readingsBulkUpdate( $hash, 'state',            $err, 1 );
-            ::readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
-            ::readingsEndUpdate( $hash, 1 );
-
-            ::Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
-
-            $hash->{actionQueue} = [];
-            return;
-        }
-    }
-
-    if (   $data eq ''
-        && exists( $param->{code} )
-        && $param->{code} != 200 )
-    {
-
-        ::readingsBeginUpdate($hash);
-        ::readingsBulkUpdate( $hash, 'state', $param->{code}, 1 );
-
-        ::readingsBulkUpdate( $hash, 'lastRequestError', $param->{code}, 1 );
-
-        ::Log3 $name, 3,
-          "TeslaPowerwall2AC ($name) - RequestERROR: $param->{code}";
-
-        ::readingsEndUpdate( $hash, 1 );
-
-        ::Log3 $name, 5,
-"TeslaPowerwall2AC ($name) - RequestERROR: received http code $param->{code} without any data after requesting";
+    if ( defined($err) && $err ne '' ) {
 
         $hash->{actionQueue} = [];
+
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdate( $hash, 'state',            $err, 1 );
+        ::readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
+        ::readingsBulkUpdateIfChanged(
+            $hash, 'actionQueue', '0 entries in the Queue'
+        );
+        ::readingsEndUpdate( $hash, 1 );
+
+        ::Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
         return;
     }
 
-    ## Fehler für neuen Token
-    ## {"code":401,"error":"User session not found from HEZwKy9lY17-gLagEdpyzk3IsJgUvrE1XFzmxcw==","message":"Invalid bearer token"}
+    my $decoded;
+    if ( defined($data) && $data ne '' ) {
+        $decoded = eval { decode_json($data) };
+        $decoded = undef if ($@);
+    }
 
-    if ( $data =~ m#{"code":(\d+),"error":"(.+)","message":"(.+)"}\z#xms ) {
+    my $apiCode =
+      ( ref($decoded) eq 'HASH' && defined( $decoded->{code} )
+        ? $decoded->{code}
+        : 0 );
 
-        if (   $1 == 401
-            && $2 =~ m#\AUser\ssession\snot\sfound\sfrom\s.*#xms
-            && $3 eq 'Invalid bearer token' )
-        {
-            $hash->{actionQueue} = [];
-            delete $hash->{TOKEN};
-            unshift @{ $hash->{actionQueue} }, 'login';
+    # The Gateway invalidates the local session, e.g. after firmware updates
+    # or a reboot. Renew the session independent of JSON formatting/order.
+    if ( ( $httpCode == 401 || $apiCode == 401 )
+        && $path ne 'login' )
+    {
+        my $message =
+          ( ref($decoded) eq 'HASH' && defined( $decoded->{message} )
+            ? $decoded->{message}
+            : 'authentication token rejected' );
 
-            ::Log3 $name, 1,
-"TeslaPowerwall2AC ($name) - Invalid bearer token. Empty action queue";
-            ::Log3 $name, 1,
-              "TeslaPowerwall2AC ($name) - Invalid bearer token. run relogin";
-            ::Log3 $name, 1,
-"TeslaPowerwall2AC ($name) - Invalid bearer token. New action queue "
-              . join ',', @{ $hash->{actionQueue} };
-
-            return Write($hash);
-        }
+        delete $hash->{TOKEN};
+        $hash->{actionQueue} = [];
 
         ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdate(
+            $hash, 'state', 'authentication expired - renewing session', 1
+        );
+        ::readingsBulkUpdate(
+            $hash,
+            'lastRequestError',
+            'Path: ' . $path . ' 401 - ' . $message
+        );
+        ::readingsBulkUpdateIfChanged(
+            $hash, 'actionQueue', '0 entries in the Queue'
+        );
+        ::readingsEndUpdate( $hash, 1 );
 
-        ::readingsBulkUpdate( $hash, 'state', $1, 1 );
+        ::Log3 $name, 3,
+"TeslaPowerwall2AC ($name) - authentication token rejected, renewing session";
+
+        unshift @{ $hash->{actionQueue} }, 'login';
+        return Write($hash);
+    }
+
+    # Optional API paths may be removed by newer Gateway firmware. Remember a
+    # 404 for the current FHEM runtime and omit that path from later automatic
+    # polling cycles. A restart intentionally probes the path again.
+    if ( $httpCode == 404
+        && defined($path)
+        && exists( $optionalPaths{$path} ) )
+    {
+        $hash->{helper}->{unsupportedPaths}->{$path} = 1;
+
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdateIfChanged(
+            $hash,
+            'actionQueue',
+            scalar( @{ $hash->{actionQueue} } ) . ' entries in the Queue'
+        );
+        ::readingsBulkUpdateIfChanged(
+            $hash,
+            'state',
+            (
+                scalar( @{ $hash->{actionQueue} } ) == 0
+                ? 'ready'
+                : 'fetch data - '
+                  . scalar( @{ $hash->{actionQueue} } )
+                  . ' paths in actionQueue'
+            )
+        );
+        ::readingsEndUpdate( $hash, 1 );
+
+        ::Log3 $name, 3,
+"TeslaPowerwall2AC ($name) - optional endpoint $path returned HTTP 404, disable automatic polling for current runtime";
+
+        ::InternalTimer( ::gettimeofday() + 3,
+            \&FHEM::Devices::Tesla::Powerwall::Write, $hash )
+          if ( scalar( @{ $hash->{actionQueue} } ) > 0 );
+
+        return;
+    }
+
+    # Handle HTTP errors even if the Gateway sends a plain-text response body.
+    # This prevents unexpected non-JSON error bodies from being passed to
+    # decode_json.
+    if ( $httpCode && $httpCode != 200 ) {
+        my $response = defined($data) ? $data : '';
+        $response =~ s/[\r\n]+/ /g;
+        $response = substr( $response, 0, 200 );
+
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdate( $hash, 'state', $httpCode, 1 );
         ::readingsBulkUpdate(
             $hash,
             'lastRequestError',
             'Path: '
-              . $param->{setCmd} . ' '
-              . $1
-              . ' - Error: '
-              . $2
-              . ' Messages: '
-              . $3,
+              . $path
+              . ' HTTP '
+              . $httpCode
+              . ( $response ne '' ? ' - Response: ' . $response : '' ),
             1
         );
-
         ::readingsEndUpdate( $hash, 1 );
+
+        ::Log3 $name, 3,
+          "TeslaPowerwall2AC ($name) - RequestERROR: HTTP $httpCode for path $path";
+
+        ::InternalTimer( ::gettimeofday() + 3,
+            \&FHEM::Devices::Tesla::Powerwall::Write, $hash )
+          if ( defined( $hash->{actionQueue} )
+            && scalar( @{ $hash->{actionQueue} } ) > 0 );
+
+        return;
     }
+
+    # Handle API errors from valid JSON without depending on key order.
+    if ( ref($decoded) eq 'HASH' && $apiCode ) {
+        my $error =
+          defined( $decoded->{error} ) ? $decoded->{error} : '';
+        my $message =
+          defined( $decoded->{message} ) ? $decoded->{message} : '';
+
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdate( $hash, 'state', $apiCode, 1 );
+        ::readingsBulkUpdate(
+            $hash,
+            'lastRequestError',
+            'Path: '
+              . $path . ' '
+              . $apiCode
+              . ' - Error: '
+              . $error
+              . ' Messages: '
+              . $message,
+            1
+        );
+        ::readingsEndUpdate( $hash, 1 );
+
+        ::InternalTimer( ::gettimeofday() + 3,
+            \&FHEM::Devices::Tesla::Powerwall::Write, $hash )
+          if ( defined( $hash->{actionQueue} )
+            && scalar( @{ $hash->{actionQueue} } ) > 0 );
+
+        return;
+    }
+
+    # A successful HTTP response that is not JSON must not poison the queue.
+    if ( defined($data) && $data ne '' && !defined($decoded) ) {
+        my $response = $data;
+        $response =~ s/[\r\n]+/ /g;
+        $response = substr( $response, 0, 200 );
+
+        ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdate( $hash, 'state', 'response error', 1 );
+        ::readingsBulkUpdate(
+            $hash,
+            'lastRequestError',
+            'Path: ' . $path . ' - invalid JSON response: ' . $response,
+            1
+        );
+        ::readingsEndUpdate( $hash, 1 );
+
+        ::Log3 $name, 3,
+          "TeslaPowerwall2AC ($name) - invalid JSON response for path $path";
+
+        ::InternalTimer( ::gettimeofday() + 3,
+            \&FHEM::Devices::Tesla::Powerwall::Write, $hash )
+          if ( defined( $hash->{actionQueue} )
+            && scalar( @{ $hash->{actionQueue} } ) > 0 );
+
+        return;
+    }
+
     ### End Error Handling
 
     ::InternalTimer( ::gettimeofday() + 3,
@@ -569,11 +742,17 @@ sub ErrorHandling {
       if ( defined( $hash->{actionQueue} )
         && scalar( @{ $hash->{actionQueue} } ) > 0 );
 
-    ::Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
+    if ( $path eq 'login' ) {
+        ::Log3 $name, 4,
+          "TeslaPowerwall2AC ($name) - Recieve JSON data for login: <token redacted>";
+    }
+    else {
+        ::Log3 $name, 4,
+          "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
+    }
 
-    return ResponseProcessing( $hash, $param->{setCmd}, $data );
+    return ResponseProcessing( $hash, $path, $data );
 }
-
 sub ResponseProcessing {
     my $hash = shift;
     my $path = shift;
@@ -637,6 +816,19 @@ sub WriteReadings {
     ::readingsBeginUpdate($hash);
     while ( my ( $r, $v ) = each %{$readings} ) {
         ::readingsBulkUpdate( $hash, $path . '-' . $r, $v );
+    }
+
+    # Newer Gateway firmware already returns site_name and timezone as part of
+    # /api/site_info. Keep the historic sitename-* readings for compatibility
+    # without polling /api/site_info/site_name separately.
+    if ( $path eq 'siteinfo' ) {
+        ::readingsBulkUpdate( $hash, 'sitename-site_name',
+            $readings->{site_name} )
+          if ( defined( $readings->{site_name} ) );
+
+        ::readingsBulkUpdate( $hash, 'sitename-timezone',
+            $readings->{timezone} )
+          if ( defined( $readings->{timezone} ) );
     }
 
     ::readingsBulkUpdate( $hash, 'batteryLevel',
