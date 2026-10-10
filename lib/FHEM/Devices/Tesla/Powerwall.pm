@@ -839,8 +839,12 @@ sub Flatten_JSON {
     if (ref($data) eq 'HASH') {
         for my $key (keys %{$data}) {
             my $k = $key;
-            $k =~ s/s$//xg if $prefix ne '';
-            my $new_prefix = $prefix eq '' ? $key : "${prefix}_${k}";
+            
+            # Singularform gezielt nur bilden, wenn der Wert ein Array ist
+            # (z.B. 'powerwalls' -> 'powerwall', 'checks' -> 'check')
+            $k =~ s/s$//xg if ref($data->{$key}) eq 'ARRAY';
+            
+            my $new_prefix = $prefix eq '' ? $k : "${prefix}_${k}";
             Flatten_JSON($data->{$key}, $new_prefix, $readings);
         }
     } elsif (ref($data) eq 'ARRAY') {
@@ -849,7 +853,8 @@ sub Flatten_JSON {
             Flatten_JSON($item, "${prefix}_${idx}", $readings);
             $idx++;
         }
-        $readings->{'numberOfWalls'} = $idx if $prefix eq 'powerwalls';
+        # Der Root-Prefix für das Array wurde oben bereits zu 'powerwall' singularisiert
+        $readings->{'numberOfWalls'} = $idx if $prefix eq 'powerwall';
     } elsif (defined $data) {
         $readings->{$prefix} = $data;
     }
