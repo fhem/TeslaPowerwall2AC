@@ -56,7 +56,6 @@ package FHEM::Devices::Tesla::Powerwall;
 
 use strict;
 use warnings;
-use experimental qw( switch );
 
 use HttpUtils;
 use GPUtils                               qw(GP_Import);
@@ -71,60 +70,17 @@ BEGIN {
     );
 }
 
-# try to use JSON::MaybeXS wrapper
-#   for chance of better performance + open code
-eval {
-    require JSON::MaybeXS;
-    import JSON::MaybeXS qw( decode_json encode_json );
-    1;
-} or do {
+my $json_loaded = 0;
+my @json_modules = ('JSON::MaybeXS', 'JSON', 'Cpanel::JSON::XS', 'JSON::XS', 'JSON::PP', 'JSON::backportPP');
+local $ENV{PERL_JSON_BACKEND} = 'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP' unless defined($ENV{PERL_JSON_BACKEND});
 
-    # try to use JSON wrapper
-    #   for chance of better performance
-    eval {
-        # JSON preference order
-        local $ENV{PERL_JSON_BACKEND} =
-          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
-          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
-
-        require JSON;
-        import JSON qw( decode_json encode_json );
-        1;
-    } or do {
-
-        # In rare cases, Cpanel::JSON::XS may
-        #   be installed but JSON|JSON::MaybeXS not ...
-        eval {
-            require Cpanel::JSON::XS;
-            import Cpanel::JSON::XS qw(decode_json encode_json);
-            1;
-        } or do {
-
-            # In rare cases, JSON::XS may
-            #   be installed but JSON not ...
-            eval {
-                require JSON::XS;
-                import JSON::XS qw(decode_json encode_json);
-                1;
-            } or do {
-
-                # Fallback to built-in JSON which SHOULD
-                #   be available since 5.014 ...
-                eval {
-                    require JSON::PP;
-                    import JSON::PP qw(decode_json encode_json);
-                    1;
-                } or do {
-
-                    # Fallback to JSON::backportPP in really rare cases
-                    require JSON::backportPP;
-                    import JSON::backportPP qw(decode_json encode_json);
-                    1;
-                };
-            };
-        };
-    };
-};
+for my $module (@json_modules) {
+    if (eval "require $module; import $module qw(decode_json encode_json); 1;") {
+        $json_loaded = 1;
+        last;
+    }
+}
+die "No JSON module found" unless $json_loaded;
 
 my %paths = (
     'statussoe'    => 'system_status/soe',
@@ -151,9 +107,19 @@ my %optionalPaths = (
     'registration' => 1,
 );
 
+sub decode_json_safe {
+    my ($json, $name) = @_;
+    local $SIG{__DIE__} = 'IGNORE';
+    my $decoded = eval { decode_json($json) };
+    if ($@) {
+        ::Log3 $name, 4, "TeslaPowerwall2AC ($name) - error while JSON decoding: $@";
+        return undef;
+    }
+    return $decoded;
+}
+
 sub Define {
-    my $hash = shift;
-    my $aArg = shift;
+    my ($hash, $aArg) = @_;
     my $version;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
@@ -186,8 +152,7 @@ sub Define {
 }
 
 sub Undef {
-    my $hash = shift;
-    my $name = shift;
+    my ($hash, $name) = @_;
 
     ::RemoveInternalTimer($hash);
     ::Log3 $name, 3, "TeslaPowerwall2AC ($name) - Device $name deleted";
@@ -262,8 +227,7 @@ q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
 }
 
 sub Notify {
-    my $hash = shift;
-    my $dev  = shift;
+    my ($hash, $dev) = @_;
 
     my $name = $hash->{NAME};
     return if ( ::IsDisabled($name) );
@@ -288,8 +252,7 @@ sub Notify {
 }
 
 sub Get {
-    my $hash = shift;
-    my $aArg = shift;
+    my ($hash, $aArg) = @_;
 
     my $name = shift @$aArg;
     my $cmd  = shift @$aArg // return qq(get $name needs at least one argument);
@@ -297,25 +260,20 @@ sub Get {
 
     $cmd = lc($cmd);
 
-    given ($cmd) {
-        when ('statussoe')    { $arg = $cmd; }
-        when ('aggregates')   { $arg = $cmd; }
-        when ('siteinfo')     { $arg = $cmd; }
-        when ('powerwalls')   { $arg = $cmd; }
-        when ('sitemaster')   { $arg = $cmd; }
-        when ('registration') { $arg = $cmd; }
-        when ('status')       { $arg = $cmd; }
-        default {
-            my $list = '';
-            $list .=
-'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg'
-              if ( ::AttrVal( $name, 'emailaddr', 'none' ) ne 'none'
-                && exists( $hash->{helper}->{passObj} )
-                && defined( $hash->{helper}->{passObj}->getReadPassword($name) )
-                && defined( $hash->{TOKEN} ) );
+    my %valid_cmds = map { $_ => 1 } qw(statussoe aggregates siteinfo powerwalls sitemaster registration status);
 
-            return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
-        }
+    if (exists $valid_cmds{$cmd}) {
+        $arg = $cmd;
+    } else {
+        my $list = '';
+        $list .=
+'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg '
+          if ( ::AttrVal( $name, 'emailaddr', 'none' ) ne 'none'
+            && exists( $hash->{helper}->{passObj} )
+            && defined( $hash->{helper}->{passObj}->getReadPassword($name) )
+            && defined( $hash->{TOKEN} ) );
+
+        return 'Unknown argument ' . $cmd . ', choose one of ' . $list;
     }
 
     return 'There are still path commands in the action queue'
@@ -329,9 +287,7 @@ sub Get {
 }
 
 sub Set {    ## no critic (Subroutine with high complexity score)
-    my $hash = shift;
-    my $aArg = shift;
-    my $hArg = shift;
+    my ($hash, $aArg, $hArg) = @_;
 
     my $name = shift @$aArg;
     my $cmd  = shift @$aArg // return qq(set $name needs at least one argument);
@@ -400,7 +356,7 @@ sub Set {    ## no critic (Subroutine with high complexity score)
 }
 
 sub Timer_GetData {
-    my $hash = shift;
+    my ($hash) = @_;
     my $name = $hash->{NAME};
 
     ::RemoveInternalTimer(
@@ -459,7 +415,7 @@ sub Timer_GetData {
 }
 
 sub Write {
-    my $hash = shift;
+    my ($hash) = @_;
     my $name = $hash->{NAME};
 
     # Only one HTTP request may be active at a time. The current queue item is
@@ -526,9 +482,7 @@ sub Write {
 }
 
 sub ErrorHandling {
-    my $param = shift;
-    my $err   = shift;
-    my $data  = shift;
+    my ($param, $err, $data) = @_;
 
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
@@ -563,8 +517,7 @@ sub ErrorHandling {
 
     my $decoded;
     if ( defined($data) && $data ne '' ) {
-        $decoded = eval { decode_json($data) };
-        $decoded = undef if ($@);
+        $decoded = decode_json_safe($data, $name);
     }
 
     my $apiCode =
@@ -753,20 +706,17 @@ sub ErrorHandling {
 
     return ResponseProcessing( $hash, $path, $data );
 }
+
 sub ResponseProcessing {
-    my $hash = shift;
-    my $path = shift;
-    my $json = shift;
+    my ($hash, $path, $json) = @_;
 
     my $name = $hash->{NAME};
-    my $decode_json;
     my $readings;
 
-    $decode_json = eval { decode_json($json) };
-    if ($@) {
-        ::Log3 $name, 4, "TeslaPowerwall2AC ($name) - error while request: $@";
+    my $decode_json = decode_json_safe($json, $name);
+    if (!defined($decode_json)) {
         ::readingsBeginUpdate($hash);
-        ::readingsBulkUpdate( $hash, 'JSON Error', $@ );
+        ::readingsBulkUpdate( $hash, 'JSON Error', 'decoding failed' );
         ::readingsBulkUpdate( $hash, 'state',      'JSON error' );
         ::readingsEndUpdate( $hash, 1 );
         return;
@@ -792,10 +742,10 @@ sub ResponseProcessing {
         return Timer_GetData($hash);
     }
     elsif ( $path eq 'meterssite' ) {
-        $readings = ReadingsProcessing_Meters_Site( $hash, $decode_json );
+        $readings = ReadingsProcessing_Meters( $hash, $decode_json, 'site' );
     }
     elsif ( $path eq 'meterssolar' ) {
-        $readings = ReadingsProcessing_Meters_Solar( $hash, $decode_json );
+        $readings = ReadingsProcessing_Meters( $hash, $decode_json, 'solar' );
     }
     else {
         $readings = $decode_json;
@@ -805,9 +755,7 @@ sub ResponseProcessing {
 }
 
 sub WriteReadings {
-    my $hash     = shift;
-    my $path     = shift;
-    my $readings = shift;
+    my ($hash, $path, $readings) = @_;
 
     my $name = $hash->{NAME};
 
@@ -866,8 +814,7 @@ sub WriteReadings {
 }
 
 sub ReadingsProcessing_Aggregates {
-    my $hash        = shift;
-    my $decode_json = shift;
+    my ($hash, $decode_json) = @_;
 
     my $name = $hash->{NAME};
     my %readings;
@@ -886,69 +833,34 @@ sub ReadingsProcessing_Aggregates {
     return \%readings;
 }
 
-sub ReadingsProcessing_Powerwalls {
-    my $hash        = shift;
-    my $decode_json = shift;
+sub Flatten_JSON {
+    my ($data, $prefix, $readings) = @_;
+    
+    if (ref($data) eq 'HASH') {
+        for my $key (keys %{$data}) {
+            my $k = $key;
+            $k =~ s/s$//xg if $prefix ne '';
+            my $new_prefix = $prefix eq '' ? $key : "${prefix}_${k}";
+            Flatten_JSON($data->{$key}, $new_prefix, $readings);
+        }
+    } elsif (ref($data) eq 'ARRAY') {
+        my $idx = 0;
+        for my $item (@{$data}) {
+            Flatten_JSON($item, "${prefix}_${idx}", $readings);
+            $idx++;
+        }
+        $readings->{'numberOfWalls'} = $idx if $prefix eq 'powerwalls';
+    } elsif (defined $data) {
+        $readings->{$prefix} = $data;
+    }
+}
 
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Powerwalls {
+    my ($hash, $decode_json) = @_;
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
-        for ( keys %{$decode_json} ) {
-            $readings{$_} = $decode_json->{$_}
-              if ( ref( $decode_json->{$_} ) ne 'ARRAY'
-                && defined( $decode_json->{$_} ) );
-
-            if ( ref( $decode_json->{$_} ) eq 'ARRAY' ) {
-                my $i  = 0;
-                my $r1 = $_;
-                my $hRef;
-                for my $hRef ( @{ $decode_json->{$_} } ) {
-                    if ( ref($hRef) eq 'HASH' ) {
-                        for ( keys %{$hRef} ) {
-                            $r1 =~ s/s$//xg;
-                            $readings{qq(${r1}_${i}_${_})} = $hRef->{$_}
-                              if ( ref( $hRef->{$_} ) ne 'ARRAY'
-                                && ref( $hRef->{$_} ) ne 'HASH'
-                                && defined( $hRef->{$_} ) );
-
-                            if ( ref( $hRef->{$_} ) eq 'HASH' ) {
-                                my $r2 = $_;
-                                my $r3 = $hRef->{$_};
-                                for ( keys %{$r3} ) {
-                                    $readings{qq(${r1}_${i}_${r2}_${_})} =
-                                      $r3->{$_}
-                                      if ( ref( $r3->{$_} ) ne 'ARRAY'
-                                        && defined( $r3->{$_} ) );
-
-                                    if ( ref( $r3->{$_} ) eq 'ARRAY' ) {
-                                        my $ii = 0;
-                                        my $r4 = $_;
-                                        for $hRef ( @{ $r3->{$_} } ) {
-                                            for ( keys %{$hRef} ) {
-                                                $r4 =~ s/s$//xg;
-                                                $readings{
-qq(${r1}_${i}_${r2}_${r4}_${ii}_${_})
-                                                } = $hRef->{$_}
-                                                  if (
-                                                    ref( $hRef->{$_} ) ne 'HASH'
-                                                    && defined( $hRef->{$_} ) );
-                                            }
-
-                                            $ii++;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    $i++;
-                }
-
-                $readings{'numberOfWalls'} = $i;
-            }
-        }
+        Flatten_JSON($decode_json, '', \%readings);
     }
     else {
         $readings{'error'} = q{powerwalls response is not a Hash};
@@ -958,8 +870,7 @@ qq(${r1}_${i}_${r2}_${r4}_${ii}_${_})
 }
 
 sub ReadingsProcessing_Site_Info {
-    my $hash        = shift;
-    my $decode_json = shift;
+    my ($hash, $decode_json) = @_;
 
     my $name = $hash->{NAME};
     my %readings;
@@ -978,107 +889,38 @@ sub ReadingsProcessing_Site_Info {
     return \%readings;
 }
 
-sub ReadingsProcessing_Meters_Site {
-    my $hash        = shift;
-    my $decode_json = shift;
-
-    my $name = $hash->{NAME};
+sub ReadingsProcessing_Meters {
+    my ($hash, $decode_json, $type) = @_;
     my %readings;
 
-    if ( ref($decode_json) eq 'ARRAY'
-        && scalar( @{$decode_json} ) > 0 )
-    {
+    if ( ref($decode_json) eq 'ARRAY' && scalar( @{$decode_json} ) > 0 ) {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
-                if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
-                    || ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
-                {
-                    if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
-                        while ( my ( $r, $v ) =
-                            each %{ $decode_json->[0]->{$obj} } )
-                        {
-                            if ( ref($v) ne 'HASH' ) {
-                                $readings{ $obj . '-' . $r } = $v;
-                            }
-                            else {
-                                while ( my ( $r2, $v2 ) =
-                                    each %{ $decode_json->[0]->{$obj}->{$r} } )
-                                {
-                                    $readings{ $obj . '-' . $r . '-' . $r2 } =
-                                      $v2;
-                                }
+                if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
+                    while ( my ( $r, $v ) = each %{ $decode_json->[0]->{$obj} } ) {
+                        if ( ref($v) ne 'HASH' ) {
+                            $readings{ $obj . '-' . $r } = $v;
+                        } else {
+                            while ( my ( $r2, $v2 ) = each %{ $decode_json->[0]->{$obj}->{$r} } ) {
+                                $readings{ $obj . '-' . $r . '-' . $r2 } = $v2;
                             }
                         }
                     }
-                    elsif ( ref( $decode_json->[0]->{$obj} ) eq 'ARRAY' ) {
-
-                    }
-                }
-                else {
+                } elsif ( ref( $decode_json->[0]->{$obj} ) ne 'ARRAY' ) {
                     $readings{$obj} = $decode_json->[0]->{$obj};
                 }
             }
         }
     }
     else {
-        $readings{'error'} = q{metes site response is not a Array};
-    }
-
-    return \%readings;
-}
-
-sub ReadingsProcessing_Meters_Solar {
-    my $hash        = shift;
-    my $decode_json = shift;
-
-    my $name = $hash->{NAME};
-    my %readings;
-
-    if ( ref($decode_json) eq 'ARRAY'
-        && scalar( @{$decode_json} ) > 0 )
-    {
-        if ( ref( $decode_json->[0] ) eq 'HASH' ) {
-            while ( my $obj = each %{ $decode_json->[0] } ) {
-                if (   ref( $decode_json->[0]->{$obj} ) eq 'ARRAY'
-                    || ref( $decode_json->[0]->{$obj} ) eq 'HASH' )
-                {
-                    if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
-                        while ( my ( $r, $v ) =
-                            each %{ $decode_json->[0]->{$obj} } )
-                        {
-                            if ( ref($v) ne 'HASH' ) {
-                                $readings{ $obj . '-' . $r } = $v;
-                            }
-                            else {
-                                while ( my ( $r2, $v2 ) =
-                                    each %{ $decode_json->[0]->{$obj}->{$r} } )
-                                {
-                                    $readings{ $obj . '-' . $r . '-' . $r2 } =
-                                      $v2;
-                                }
-                            }
-                        }
-                    }
-                    elsif ( ref( $decode_json->[0]->{$obj} ) eq 'ARRAY' ) {
-
-                    }
-                }
-                else {
-                    $readings{$obj} = $decode_json->[0]->{$obj};
-                }
-            }
-        }
-    }
-    else {
-        $readings{'error'} = q{metes solar response is not a Array};
+        $readings{'error'} = "meters $type response is not an Array";
     }
 
     return \%readings;
 }
 
 sub CreateUri {
-    my $hash = shift;
-    my $path = shift;
+    my ($hash, $path) = @_;
 
     my $name = $hash->{NAME};
     my $host = $hash->{HOST};
@@ -1106,7 +948,7 @@ sub CreateUri {
           . '","force_sm_off":false}';
     }
     elsif ($path eq 'powerwallsstop'
-        || $path eq 'powerwallsruns' )
+        || $path eq 'powerwallsrun' )
     {
         $uri = $host . '/api/' . $cmdPaths{$path};
     }
@@ -1115,8 +957,7 @@ sub CreateUri {
 }
 
 sub Rename {
-    my $new = shift;
-    my $old = shift;
+    my ($new, $old) = @_;
 
     my $hash = $defs{$new};
 
