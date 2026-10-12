@@ -2,8 +2,19 @@
 #
 # Developed with VSCodium and richterger perl plugin.
 #
-#  (c) 2017-2023 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2017-2026 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
+#
+#   Special thanks goes to comitters:
+#       - Eckat        Thanks for many Code
+#                    - Automatische Recovery bei ungültigem Auth-Token
+#                    - Queue-/Timer-Race beseitigt
+#                    - Defensiver Umgang mit leerer Queue
+#                    - Robustere HTTP-/JSON-Fehlerbehandlung
+#                    - Token nicht mehr im Log
+#                    - customer/registration als optionaler Endpoint
+#                    - Redundanten site_info/site_name-Request entfernt
+#
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -196,7 +207,7 @@ sub Initialize {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.1.0",
+  "version": "v3.0.0",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],

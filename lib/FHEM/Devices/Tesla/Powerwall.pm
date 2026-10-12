@@ -2,13 +2,24 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2016-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2016-2026 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
 #  any later version.
+#
+#   Special thanks goes to comitters:
+#       - Eckat        Thanks for many Code
+#                    - Automatische Recovery bei ungültigem Auth-Token
+#                    - Queue-/Timer-Race beseitigt
+#                    - Defensiver Umgang mit leerer Queue
+#                    - Robustere HTTP-/JSON-Fehlerbehandlung
+#                    - Token nicht mehr im Log
+#                    - customer/registration als optionaler Endpoint
+#                    - Redundanten site_info/site_name-Request entfernt
+#
 #
 #  The GNU General Public License can be found at
 #  http://www.gnu.org/copyleft/gpl.html.
@@ -70,12 +81,20 @@ BEGIN {
     );
 }
 
-my $json_loaded = 0;
-my @json_modules = ('JSON::MaybeXS', 'JSON', 'Cpanel::JSON::XS', 'JSON::XS', 'JSON::PP', 'JSON::backportPP');
-local $ENV{PERL_JSON_BACKEND} = 'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP' unless defined($ENV{PERL_JSON_BACKEND});
+my $json_loaded  = 0;
+my @json_modules = (
+    'JSON::MaybeXS',    'JSON',
+    'Cpanel::JSON::XS', 'JSON::XS',
+    'JSON::PP',         'JSON::backportPP'
+);
+local $ENV{PERL_JSON_BACKEND} =
+  'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+  unless defined( $ENV{PERL_JSON_BACKEND} );
 
 for my $module (@json_modules) {
-    if (eval "require $module; import $module qw(decode_json encode_json); 1;") {
+    if (
+        eval "require $module; import $module qw(decode_json encode_json); 1;" )
+    {
         $json_loaded = 1;
         last;
     }
@@ -103,23 +122,22 @@ my %cmdPaths = (
 # Optional endpoints may disappear with newer Gateway firmware. A 404 on one
 # of these paths disables only the automatic polling for the current FHEM
 # runtime. Manual get commands remain available and a restart probes again.
-my %optionalPaths = (
-    'registration' => 1,
-);
+my %optionalPaths = ( 'registration' => 1, );
 
 sub decode_json_safe {
-    my ($json, $name) = @_;
+    my ( $json, $name ) = @_;
     local $SIG{__DIE__} = 'IGNORE';
     my $decoded = eval { decode_json($json) };
     if ($@) {
-        ::Log3 $name, 4, "TeslaPowerwall2AC ($name) - error while JSON decoding: $@";
+        ::Log3 $name, 4,
+          "TeslaPowerwall2AC ($name) - error while JSON decoding: $@";
         return undef;
     }
     return $decoded;
 }
 
 sub Define {
-    my ($hash, $aArg) = @_;
+    my ( $hash, $aArg ) = @_;
     my $version;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
@@ -152,7 +170,7 @@ sub Define {
 }
 
 sub Undef {
-    my ($hash, $name) = @_;
+    my ( $hash, $name ) = @_;
 
     ::RemoveInternalTimer($hash);
     ::Log3 $name, 3, "TeslaPowerwall2AC ($name) - Device $name deleted";
@@ -201,10 +219,8 @@ q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
 
             }
             else {
-                ::RemoveInternalTimer(
-                    $hash,
-                    \&FHEM::Devices::Tesla::Powerwall::Timer_GetData
-                );
+                ::RemoveInternalTimer( $hash,
+                    \&FHEM::Devices::Tesla::Powerwall::Timer_GetData );
                 $hash->{INTERVAL} = $attrVal;
                 ::Log3 $name, 3,
                   "TeslaPowerwall2AC ($name) - set interval to $attrVal";
@@ -212,10 +228,8 @@ q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
             }
         }
         elsif ( $cmd eq 'del' ) {
-            ::RemoveInternalTimer(
-                $hash,
-                \&FHEM::Devices::Tesla::Powerwall::Timer_GetData
-            );
+            ::RemoveInternalTimer( $hash,
+                \&FHEM::Devices::Tesla::Powerwall::Timer_GetData );
             $hash->{INTERVAL} = 300;
             ::Log3 $name, 3,
               "TeslaPowerwall2AC ($name) - set interval to default";
@@ -227,7 +241,7 @@ q{interval too small, please use something >= 60 (sec), default is 300 (sec)};
 }
 
 sub Notify {
-    my ($hash, $dev) = @_;
+    my ( $hash, $dev ) = @_;
 
     my $name = $hash->{NAME};
     return if ( ::IsDisabled($name) );
@@ -252,7 +266,7 @@ sub Notify {
 }
 
 sub Get {
-    my ($hash, $aArg) = @_;
+    my ( $hash, $aArg ) = @_;
 
     my $name = shift @$aArg;
     my $cmd  = shift @$aArg // return qq(get $name needs at least one argument);
@@ -260,11 +274,13 @@ sub Get {
 
     $cmd = lc($cmd);
 
-    my %valid_cmds = map { $_ => 1 } qw(statussoe aggregates siteinfo powerwalls sitemaster registration status);
+    my %valid_cmds = map { $_ => 1 }
+      qw(statussoe aggregates siteinfo powerwalls sitemaster registration status);
 
-    if (exists $valid_cmds{$cmd}) {
+    if ( exists $valid_cmds{$cmd} ) {
         $arg = $cmd;
-    } else {
+    }
+    else {
         my $list = '';
         $list .=
 'statusSOE:noArg aggregates:noArg siteinfo:noArg sitemaster:noArg powerwalls:noArg registration:noArg status:noArg '
@@ -287,7 +303,7 @@ sub Get {
 }
 
 sub Set {    ## no critic (Subroutine with high complexity score)
-    my ($hash, $aArg, $hArg) = @_;
+    my ( $hash, $aArg, $hArg ) = @_;
 
     my $name = shift @$aArg;
     my $cmd  = shift @$aArg // return qq(set $name needs at least one argument);
@@ -359,12 +375,10 @@ sub Timer_GetData {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    ::RemoveInternalTimer(
-        $hash,
-        \&FHEM::Devices::Tesla::Powerwall::Timer_GetData
-    );
+    ::RemoveInternalTimer( $hash,
+        \&FHEM::Devices::Tesla::Powerwall::Timer_GetData );
 
-    if ( exists( $hash->{actionQueue} )
+    if (   exists( $hash->{actionQueue} )
         && scalar( @{ $hash->{actionQueue} } ) == 0
         && !$hash->{helper}->{requestInFlight} )
     {
@@ -392,7 +406,8 @@ sub Timer_GetData {
                     next
                       if ( exists( $optionalPaths{$obj} )
                         && exists( $hash->{helper}->{unsupportedPaths} )
-                        && exists( $hash->{helper}->{unsupportedPaths}->{$obj} ) );
+                        && exists( $hash->{helper}->{unsupportedPaths}->{$obj} )
+                      );
 
                     unshift @{ $hash->{actionQueue} }, $obj;
                 }
@@ -424,18 +439,17 @@ sub Write {
     return
       if ( $hash->{helper}->{requestInFlight} );
 
-    if ( !exists( $hash->{actionQueue} )
+    if (  !exists( $hash->{actionQueue} )
         || scalar( @{ $hash->{actionQueue} } ) == 0 )
     {
         ::readingsBeginUpdate($hash);
-        ::readingsBulkUpdateIfChanged(
-            $hash, 'actionQueue', '0 entries in the Queue'
-        );
+        ::readingsBulkUpdateIfChanged( $hash, 'actionQueue',
+            '0 entries in the Queue' );
         ::readingsBulkUpdateIfChanged( $hash, 'state', 'ready' );
         ::readingsEndUpdate( $hash, 1 );
 
         ::Log3 $name, 4,
-          "TeslaPowerwall2AC ($name) - Write called with empty actionQueue, ignoring";
+"TeslaPowerwall2AC ($name) - Write called with empty actionQueue, ignoring";
         return;
     }
 
@@ -446,11 +460,8 @@ sub Write {
     $hash->{helper}->{requestInFlight} = 1;
 
     ::readingsBeginUpdate($hash);
-    ::readingsBulkUpdateIfChanged(
-        $hash,
-        'actionQueue',
-        scalar( @{ $hash->{actionQueue} } ) . ' entries in the Queue'
-    );
+    ::readingsBulkUpdateIfChanged( $hash, 'actionQueue',
+        scalar( @{ $hash->{actionQueue} } ) . ' entries in the Queue' );
     ::readingsBulkUpdate(
         $hash,
         'state',
@@ -482,7 +493,7 @@ sub Write {
 }
 
 sub ErrorHandling {
-    my ($param, $err, $data) = @_;
+    my ( $param, $err, $data ) = @_;
 
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
@@ -492,10 +503,11 @@ sub ErrorHandling {
     # of whether it completed successfully or with an error.
     $hash->{helper}->{requestInFlight} = 0;
 
-    my $httpCode =
-      ( exists( $param->{code} ) && defined( $param->{code} )
+    my $httpCode = (
+        exists( $param->{code} ) && defined( $param->{code} )
         ? $param->{code}
-        : 0 );
+        : 0
+    );
 
     ### Begin Error Handling
 
@@ -506,9 +518,8 @@ sub ErrorHandling {
         ::readingsBeginUpdate($hash);
         ::readingsBulkUpdate( $hash, 'state',            $err, 1 );
         ::readingsBulkUpdate( $hash, 'lastRequestError', $err, 1 );
-        ::readingsBulkUpdateIfChanged(
-            $hash, 'actionQueue', '0 entries in the Queue'
-        );
+        ::readingsBulkUpdateIfChanged( $hash, 'actionQueue',
+            '0 entries in the Queue' );
         ::readingsEndUpdate( $hash, 1 );
 
         ::Log3 $name, 3, "TeslaPowerwall2AC ($name) - RequestERROR: $err";
@@ -517,39 +528,36 @@ sub ErrorHandling {
 
     my $decoded;
     if ( defined($data) && $data ne '' ) {
-        $decoded = decode_json_safe($data, $name);
+        $decoded = decode_json_safe( $data, $name );
     }
 
-    my $apiCode =
-      ( ref($decoded) eq 'HASH' && defined( $decoded->{code} )
+    my $apiCode = (
+        ref($decoded) eq 'HASH' && defined( $decoded->{code} )
         ? $decoded->{code}
-        : 0 );
+        : 0
+    );
 
     # The Gateway invalidates the local session, e.g. after firmware updates
     # or a reboot. Renew the session independent of JSON formatting/order.
     if ( ( $httpCode == 401 || $apiCode == 401 )
         && $path ne 'login' )
     {
-        my $message =
-          ( ref($decoded) eq 'HASH' && defined( $decoded->{message} )
+        my $message = (
+            ref($decoded) eq 'HASH' && defined( $decoded->{message} )
             ? $decoded->{message}
-            : 'authentication token rejected' );
+            : 'authentication token rejected'
+        );
 
         delete $hash->{TOKEN};
         $hash->{actionQueue} = [];
 
         ::readingsBeginUpdate($hash);
-        ::readingsBulkUpdate(
-            $hash, 'state', 'authentication expired - renewing session', 1
-        );
-        ::readingsBulkUpdate(
-            $hash,
-            'lastRequestError',
-            'Path: ' . $path . ' 401 - ' . $message
-        );
-        ::readingsBulkUpdateIfChanged(
-            $hash, 'actionQueue', '0 entries in the Queue'
-        );
+        ::readingsBulkUpdate( $hash, 'state',
+            'authentication expired - renewing session', 1 );
+        ::readingsBulkUpdate( $hash, 'lastRequestError',
+            'Path: ' . $path . ' 401 - ' . $message );
+        ::readingsBulkUpdateIfChanged( $hash, 'actionQueue',
+            '0 entries in the Queue' );
         ::readingsEndUpdate( $hash, 1 );
 
         ::Log3 $name, 3,
@@ -562,21 +570,17 @@ sub ErrorHandling {
     # Optional API paths may be removed by newer Gateway firmware. Remember a
     # 404 for the current FHEM runtime and omit that path from later automatic
     # polling cycles. A restart intentionally probes the path again.
-    if ( $httpCode == 404
+    if (   $httpCode == 404
         && defined($path)
         && exists( $optionalPaths{$path} ) )
     {
         $hash->{helper}->{unsupportedPaths}->{$path} = 1;
 
         ::readingsBeginUpdate($hash);
+        ::readingsBulkUpdateIfChanged( $hash, 'actionQueue',
+            scalar( @{ $hash->{actionQueue} } ) . ' entries in the Queue' );
         ::readingsBulkUpdateIfChanged(
-            $hash,
-            'actionQueue',
-            scalar( @{ $hash->{actionQueue} } ) . ' entries in the Queue'
-        );
-        ::readingsBulkUpdateIfChanged(
-            $hash,
-            'state',
+            $hash, 'state',
             (
                 scalar( @{ $hash->{actionQueue} } ) == 0
                 ? 'ready'
@@ -620,7 +624,7 @@ sub ErrorHandling {
         ::readingsEndUpdate( $hash, 1 );
 
         ::Log3 $name, 3,
-          "TeslaPowerwall2AC ($name) - RequestERROR: HTTP $httpCode for path $path";
+"TeslaPowerwall2AC ($name) - RequestERROR: HTTP $httpCode for path $path";
 
         ::InternalTimer( ::gettimeofday() + 3,
             \&FHEM::Devices::Tesla::Powerwall::Write, $hash )
@@ -669,12 +673,8 @@ sub ErrorHandling {
 
         ::readingsBeginUpdate($hash);
         ::readingsBulkUpdate( $hash, 'state', 'response error', 1 );
-        ::readingsBulkUpdate(
-            $hash,
-            'lastRequestError',
-            'Path: ' . $path . ' - invalid JSON response: ' . $response,
-            1
-        );
+        ::readingsBulkUpdate( $hash, 'lastRequestError',
+            'Path: ' . $path . ' - invalid JSON response: ' . $response, 1 );
         ::readingsEndUpdate( $hash, 1 );
 
         ::Log3 $name, 3,
@@ -697,24 +697,23 @@ sub ErrorHandling {
 
     if ( $path eq 'login' ) {
         ::Log3 $name, 4,
-          "TeslaPowerwall2AC ($name) - Recieve JSON data for login: <token redacted>";
+"TeslaPowerwall2AC ($name) - Recieve JSON data for login: <token redacted>";
     }
     else {
-        ::Log3 $name, 4,
-          "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
+        ::Log3 $name, 4, "TeslaPowerwall2AC ($name) - Recieve JSON data: $data";
     }
 
     return ResponseProcessing( $hash, $path, $data );
 }
 
 sub ResponseProcessing {
-    my ($hash, $path, $json) = @_;
+    my ( $hash, $path, $json ) = @_;
 
     my $name = $hash->{NAME};
     my $readings;
 
-    my $decode_json = decode_json_safe($json, $name);
-    if (!defined($decode_json)) {
+    my $decode_json = decode_json_safe( $json, $name );
+    if ( !defined($decode_json) ) {
         ::readingsBeginUpdate($hash);
         ::readingsBulkUpdate( $hash, 'JSON Error', 'decoding failed' );
         ::readingsBulkUpdate( $hash, 'state',      'JSON error' );
@@ -755,7 +754,7 @@ sub ResponseProcessing {
 }
 
 sub WriteReadings {
-    my ($hash, $path, $readings) = @_;
+    my ( $hash, $path, $readings ) = @_;
 
     my $name = $hash->{NAME};
 
@@ -814,7 +813,7 @@ sub WriteReadings {
 }
 
 sub ReadingsProcessing_Aggregates {
-    my ($hash, $decode_json) = @_;
+    my ( $hash, $decode_json ) = @_;
 
     my $name = $hash->{NAME};
     my %readings;
@@ -834,38 +833,41 @@ sub ReadingsProcessing_Aggregates {
 }
 
 sub Flatten_JSON {
-    my ($data, $prefix, $readings) = @_;
-    
-    if (ref($data) eq 'HASH') {
-        for my $key (keys %{$data}) {
+    my ( $data, $prefix, $readings ) = @_;
+
+    if ( ref($data) eq 'HASH' ) {
+        for my $key ( keys %{$data} ) {
             my $k = $key;
-            
+
             # Singularform gezielt nur bilden, wenn der Wert ein Array ist
             # (z.B. 'powerwalls' -> 'powerwall', 'checks' -> 'check')
-            $k =~ s/s$//xg if ref($data->{$key}) eq 'ARRAY';
-            
+            $k =~ s/s$//xg if ref( $data->{$key} ) eq 'ARRAY';
+
             my $new_prefix = $prefix eq '' ? $k : "${prefix}_${k}";
-            Flatten_JSON($data->{$key}, $new_prefix, $readings);
+            Flatten_JSON( $data->{$key}, $new_prefix, $readings );
         }
-    } elsif (ref($data) eq 'ARRAY') {
+    }
+    elsif ( ref($data) eq 'ARRAY' ) {
         my $idx = 0;
-        for my $item (@{$data}) {
-            Flatten_JSON($item, "${prefix}_${idx}", $readings);
+        for my $item ( @{$data} ) {
+            Flatten_JSON( $item, "${prefix}_${idx}", $readings );
             $idx++;
         }
-        # Der Root-Prefix für das Array wurde oben bereits zu 'powerwall' singularisiert
+
+# Der Root-Prefix für das Array wurde oben bereits zu 'powerwall' singularisiert
         $readings->{'numberOfWalls'} = $idx if $prefix eq 'powerwall';
-    } elsif (defined $data) {
+    }
+    elsif ( defined $data ) {
         $readings->{$prefix} = $data;
     }
 }
 
 sub ReadingsProcessing_Powerwalls {
-    my ($hash, $decode_json) = @_;
+    my ( $hash, $decode_json ) = @_;
     my %readings;
 
     if ( ref($decode_json) eq 'HASH' ) {
-        Flatten_JSON($decode_json, '', \%readings);
+        Flatten_JSON( $decode_json, '', \%readings );
     }
     else {
         $readings{'error'} = q{powerwalls response is not a Hash};
@@ -875,7 +877,7 @@ sub ReadingsProcessing_Powerwalls {
 }
 
 sub ReadingsProcessing_Site_Info {
-    my ($hash, $decode_json) = @_;
+    my ( $hash, $decode_json ) = @_;
 
     my $name = $hash->{NAME};
     my %readings;
@@ -895,23 +897,29 @@ sub ReadingsProcessing_Site_Info {
 }
 
 sub ReadingsProcessing_Meters {
-    my ($hash, $decode_json, $type) = @_;
+    my ( $hash, $decode_json, $type ) = @_;
     my %readings;
 
     if ( ref($decode_json) eq 'ARRAY' && scalar( @{$decode_json} ) > 0 ) {
         if ( ref( $decode_json->[0] ) eq 'HASH' ) {
             while ( my $obj = each %{ $decode_json->[0] } ) {
                 if ( ref( $decode_json->[0]->{$obj} ) eq 'HASH' ) {
-                    while ( my ( $r, $v ) = each %{ $decode_json->[0]->{$obj} } ) {
+                    while ( my ( $r, $v ) =
+                        each %{ $decode_json->[0]->{$obj} } )
+                    {
                         if ( ref($v) ne 'HASH' ) {
                             $readings{ $obj . '-' . $r } = $v;
-                        } else {
-                            while ( my ( $r2, $v2 ) = each %{ $decode_json->[0]->{$obj}->{$r} } ) {
+                        }
+                        else {
+                            while ( my ( $r2, $v2 ) =
+                                each %{ $decode_json->[0]->{$obj}->{$r} } )
+                            {
                                 $readings{ $obj . '-' . $r . '-' . $r2 } = $v2;
                             }
                         }
                     }
-                } elsif ( ref( $decode_json->[0]->{$obj} ) ne 'ARRAY' ) {
+                }
+                elsif ( ref( $decode_json->[0]->{$obj} ) ne 'ARRAY' ) {
                     $readings{$obj} = $decode_json->[0]->{$obj};
                 }
             }
@@ -925,7 +933,7 @@ sub ReadingsProcessing_Meters {
 }
 
 sub CreateUri {
-    my ($hash, $path) = @_;
+    my ( $hash, $path ) = @_;
 
     my $name = $hash->{NAME};
     my $host = $hash->{HOST};
@@ -962,7 +970,7 @@ sub CreateUri {
 }
 
 sub Rename {
-    my ($new, $old) = @_;
+    my ( $new, $old ) = @_;
 
     my $hash = $defs{$new};
 
